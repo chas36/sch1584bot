@@ -4,15 +4,15 @@ import sqlite3
 from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
 from telebot import types
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CallbackQueryHandler
+#from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+#from telegram.ext import CallbackQueryHandler
 
 # Инициализация бота
 bot = telebot.TeleBot('6332665358:AAHXpmnyWO4yKza0GAvgcy6nCFVwETs1aaA')
 
 # Подключение к Google Sheets
 scope = 'https://spreadsheets.google.com/feeds https://www.googleapis.com/auth/drive'
-credentials = ServiceAccountCredentials.from_json_keyfile_name(r'C:\Users\Анд\PycharmProjects\sch1584bot\sch1584-53262c1690a5.json', scope)
+credentials = ServiceAccountCredentials.from_json_keyfile_name(r'C:\Users\Пользователь\PycharmProjects\sch1584bot\sch1584-0b47bcc851fb.json', scope)
 gc = gspread.authorize(credentials)
 
 # ID вашей таблицы
@@ -24,24 +24,85 @@ worksheet = gc.open_by_key(spreadsheet_id).sheet1  # Предполагаетс�
 # Имя файла базы данных SQLite
 DB_FILE = 'user_states.db'
 
+# Функция для создания таблиц в базе данных
 def create_tables():
-    conn = sqlite3.connect(DB_FILE)
+    # Подключаемся к базе данных
+    conn = sqlite3.connect(DB_FILE)  # Замените 'your_database.db' на ваше название базы данных
     cursor = conn.cursor()
+
+    # Создаем таблицу users
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS user_states (
-            user_id INTEGER PRIMARY KEY,
-            selected_parallel TEXT
-        )
-    ''')
+           CREATE TABLE IF NOT EXISTS users (
+               id INTEGER PRIMARY KEY,
+               user_id INTEGER,
+               selected_parallel TEXT,
+               FOREIGN KEY (user_id) REFERENCES users (id)
+           )
+       ''')
+
+    # Создаем таблицу user_classes
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS user_classes (
-            user_id INTEGER PRIMARY KEY,
-            selected_classes TEXT
-        )
-    ''')
+           CREATE TABLE IF NOT EXISTS user_classes (
+               id INTEGER PRIMARY KEY,
+               user_id INTEGER,
+               class_name TEXT,
+               FOREIGN KEY (user_id) REFERENCES users (id)
+           )
+       ''')
+
     conn.commit()
     conn.close()
 
+def update_database_structure():
+    conn = sqlite3.connect('your_database.db')
+    cursor = conn.cursor()
+
+    # Добавим столбец selected_parallel к таблице users
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN selected_parallel TEXT')
+    except sqlite3.OperationalError as e:
+        print(f"Error: {e}")
+
+    # Добавим таблицу user_classes, если её нет
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_classes (
+            user_id INTEGER PRIMARY KEY,
+            current_class TEXT,
+            FOREIGN KEY (current_class) REFERENCES classes(class_name)
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+
+def create_user_classes_table():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_classes (
+            user_id INTEGER PRIMARY KEY,
+            current_class TEXT,
+            FOREIGN KEY (current_class) REFERENCES classes(class_name)
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+# Функция для загрузки классов пользователя
+def load_user_classes(user_id):
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT class_name FROM user_classes WHERE user_id = ?
+    ''', (user_id,))
+
+    result = cursor.fetchall()
+
+    conn.close()
+
+    return [item[0] for item in result]
 def save_user_state(user_id, selected_parallel):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -54,44 +115,51 @@ def save_user_state(user_id, selected_parallel):
 def load_user_state(user_id):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
+
     cursor.execute('''
-        SELECT selected_parallel FROM user_states WHERE user_id = ?
+        SELECT current_class FROM user_classes WHERE user_id = ?
     ''', (user_id,))
+
     result = cursor.fetchone()
+
     conn.close()
+
     return result[0] if result else None
 
-def save_user_classes(user_id, selected_classes):
+def save_user_class(user_id, current_class):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute('''
-        INSERT OR REPLACE INTO user_classes (user_id, selected_classes) VALUES (?, ?)
-    ''', (user_id, selected_classes))
+
+    cursor.execute('UPDATE users SET current_class = ? WHERE user_id = ?', (current_class, user_id))
+
     conn.commit()
     conn.close()
 
-def load_user_classes(user_id):
+def load_user_class(user_id):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute('''
-        SELECT selected_classes FROM user_classes WHERE user_id = ?
-    ''', (user_id,))
+
+    cursor.execute('SELECT current_class FROM users WHERE user_id = ?', (user_id,))
     result = cursor.fetchone()
+
     conn.close()
-    return result[0] if result else None
+
+    if result:
+        return result[0]
+    else:
+        return None
+
 
 # Добавим функцию для создания таблицы user_classes
-def create_user_classes_table():
+def create_user(user_id):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS user_classes (
-            user_id INTEGER PRIMARY KEY,
-            selected_classes TEXT
-        )
-    ''')
+
+    cursor.execute('INSERT INTO users (user_id, current_class) VALUES (?, ?)', (user_id, None))
+
     conn.commit()
     conn.close()
+
 
 # Декоратор для обработки команды /start
 @bot.message_handler(commands=['start'])
@@ -131,6 +199,12 @@ def help_command(message):
 # Декоратор для команды "choose_class"
 @bot.message_handler(commands=['choose_class'])
 def choose_class(message):
+    user_id = message.from_user.id
+    user_classes = load_user_classes(user_id)
+
+    if not user_classes:
+        bot.send_message(user_id, "Сначала выберите класс с помощью команды /choose_class")
+        return
     chat_id = message.chat.id
     user_id = message.from_user.id
 
