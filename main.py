@@ -209,7 +209,7 @@ def handle_parallel_selection(call):
     selected_parallel = call.data.split('_')[1]
 
     # Сохраняем состояние пользователя (выбранную параллель)
-    save_user_state(user_id, selected_parallel)
+    #save_user_state(user_id, selected_parallel)
 
     # Получаем список уникальных классов для выбранной параллели
     class_column = worksheet.col_values(2)[1:]
