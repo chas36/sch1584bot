@@ -37,25 +37,26 @@ def create_tables():
     conn.commit()
     conn.close()
 
-def save_user_state(user_id, selected_class):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT OR IGNORE INTO user_states (user_id, selected_class) VALUES (?, ?)
-    ''', (user_id, selected_class))
-    conn.commit()
-    conn.close()
-
-# Загрузка всех выбранных классов для пользователя
+# Функция для загрузки всех выбранных классов для пользователя
 def load_user_states(user_id):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''
         SELECT selected_class FROM user_states WHERE user_id = ?
     ''', (user_id,))
-    result = cursor.fetchall()
+    results = cursor.fetchall()
     conn.close()
-    return [record[0] for record in result] if result else []
+    return [result[0] for result in results] if results else []
+
+# Ваша существующая функция для сохранения состояния пользователя
+def save_user_state(user_id, selected_class):
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT OR REPLACE INTO user_states (user_id, selected_class) VALUES (?, ?)
+    ''', (user_id, selected_class))
+    conn.commit()
+    conn.close()
 
 # Декоратор для обработки Inline-кнопок
 @bot.callback_query_handler(func=lambda call: call.data.startswith('class_') or call.data == 'choose_class')
@@ -82,12 +83,17 @@ def handle_class_selection(call):
         bot.send_message(call.message.chat.id, f"Вы выбрали класс: {selected_class}", reply_markup=confirm_keyboard)
 
 # Логика обработки выбора класса
-def handle_class_selection(chat_id, selected_classes):
-    # Получаем список учеников для выбранных классов
-    students_for_classes = get_students_for_classes(selected_classes)
+def handle_class_selection(chat_id, user_id):
+    # Получаем список всех выбранных классов для данного пользователя
+    selected_classes = load_user_states(user_id)
 
-    # Отправляем список учеников учителю
-    bot.send_message(chat_id, f"Список учеников в выбранных классах:\n" + "\n".join(students_for_classes))
+    if selected_classes:
+        # Формируем сообщение с перечислением выбранных классов
+        message_text = f"Ваши текущие классы:\n" + "\n".join(selected_classes)
+        bot.send_message(chat_id, message_text)
+    else:
+        bot.send_message(chat_id, "Вы еще не выбрали ни одного класса.")
+
 
 # Получение списка учеников для выбранных классов
 def get_students_for_classes(selected_classes):
@@ -156,7 +162,12 @@ def handle_confirm_selection(call):
     save_user_state(user_id, selected_class)
 
     # Отправляем сообщение о подтверждении выбора
-    bot.send_message(call.message.chat.id, f"Ваш класс: {selected_class}. Выбор подтвержден!")
+    selected_classes = load_user_states(user_id)
+    if selected_classes:
+        classes_message = "\n".join(selected_classes)
+        bot.send_message(call.message.chat.id, f"Ваши классы:\n{classes_message}\nВыбор подтвержден!")
+    else:
+        bot.send_message(call.message.chat.id, "Ни один класс не выбран. Выберите класс снова.")
 
 
 # Декоратор для команды "choose_class"
