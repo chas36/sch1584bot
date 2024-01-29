@@ -3,8 +3,8 @@ import gspread
 import sqlite3
 from oauth2client.service_account import ServiceAccountCredentials
 from telebot import types
-#from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-#from telegram.ext import CallbackQueryHandler
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CallbackQueryHandler
 
 # Инициализация бота
 bot = telebot.TeleBot('6332665358:AAHXpmnyWO4yKza0GAvgcy6nCFVwETs1aaA')
@@ -150,6 +150,20 @@ def get_students_for_class(selected_class):
 
     # Возвращаем отсортированный список имен учеников
     return [student[0] for student in sorted_students]
+
+# Декоратор для команды "/my_classes"
+@bot.message_handler(commands=['my_classes'])
+def my_classes(message):
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+
+    # Загружаем состояние пользователя (выбранные классы)
+    selected_classes = load_user_states(user_id)
+
+    if selected_classes:
+        bot.send_message(chat_id, f"Ваши выбранные классы: {', '.join(selected_classes)}")
+    else:
+        bot.send_message(chat_id, "Вы еще не выбрали ни одного класса. Используйте /choose_class.")
 
 
 # Декоратор для обработки подтверждения выбора
