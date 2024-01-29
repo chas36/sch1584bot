@@ -103,22 +103,28 @@ def get_students_for_class(selected_class):
     return [student[0] for student in sorted_students]
 
 # Декоратор для обработки Inline-кнопок
-@bot.callback_query_handler(func=lambda call: call.data.startswith('class_'))
+@bot.callback_query_handler(func=lambda call: call.data.startswith('class_') or call.data == 'choose_class')
 def handle_class_selection(call):
     user_id = call.from_user.id
-    selected_class = call.data.split('_')[1]
 
-    # Создаем кнопки для подтверждения и выбора еще одного класса
-    confirm_button = types.InlineKeyboardButton("Подтвердить выбор", callback_data=f"confirm_{selected_class}")
-    choose_another_button = types.InlineKeyboardButton("Выбрать еще один класс", callback_data="choose_class")
+    # Если нажата кнопка "Выбрать еще один класс", вызываем функцию выбора класса
+    if call.data == 'choose_class':
+        choose_class(call.message)
+    else:
+        # Если выбран конкретный класс, создаем кнопки для подтверждения и выбора еще одного класса
+        selected_class = call.data.split('_')[1]
 
-    # Создаем клавиатуру с этими кнопками
-    confirm_keyboard = types.InlineKeyboardMarkup(row_width=2)
-    confirm_keyboard.add(confirm_button, choose_another_button)
+        confirm_button = types.InlineKeyboardButton("Подтвердить выбор", callback_data=f"confirm_{selected_class}")
+        choose_another_button = types.InlineKeyboardButton("Выбрать еще один класс", callback_data="choose_class")
 
-    # Отправляем сообщение с клавиатурой для подтверждения выбора
-    bot.send_message(call.message.chat.id, f"Вы выбрали класс: {selected_class}", reply_markup=confirm_keyboard)
+        confirm_keyboard = types.InlineKeyboardMarkup(row_width=2)
+        confirm_keyboard.add(confirm_button, choose_another_button)
 
+        # Сохраняем состояние пользователя (выбранный класс)
+        save_user_state(user_id, selected_class)
+
+        # Отправляем сообщение с клавиатурой для подтверждения выбора
+        bot.send_message(call.message.chat.id, f"Вы выбрали класс: {selected_class}", reply_markup=confirm_keyboard)
 
 # Декоратор для обработки подтверждения выбора
 @bot.callback_query_handler(func=lambda call: call.data.startswith('confirm_'))
@@ -131,9 +137,6 @@ def handle_confirm_selection(call):
 
     # Отправляем сообщение о подтверждении выбора
     bot.send_message(call.message.chat.id, f"Ваш класс: {selected_class}. Выбор подтвержден!")
-
-    # Вызываем функцию выбора класса для дальнейшего выбора
-    choose_class(call.message)
 
 
 # Декоратор для команды "choose_class"
