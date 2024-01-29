@@ -29,31 +29,74 @@ def create_tables():
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_states (
-            user_id INTEGER PRIMARY KEY,
-            selected_parallel TEXT
+            user_id INTEGER,
+            selected_class TEXT,
+            PRIMARY KEY (user_id, selected_class)
         )
     ''')
     conn.commit()
     conn.close()
 
-def save_user_state(user_id, selected_parallel):
+def save_user_state(user_id, selected_class):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT OR REPLACE INTO user_states (user_id, selected_parallel) VALUES (?, ?)
-    ''', (user_id, selected_parallel))
+        INSERT OR IGNORE INTO user_states (user_id, selected_class) VALUES (?, ?)
+    ''', (user_id, selected_class))
     conn.commit()
     conn.close()
 
-def load_user_state(user_id):
+# Загрузка всех выбранных классов для пользователя
+def load_user_states(user_id):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT selected_parallel FROM user_states WHERE user_id = ?
+        SELECT selected_class FROM user_states WHERE user_id = ?
     ''', (user_id,))
-    result = cursor.fetchone()
+    result = cursor.fetchall()
     conn.close()
-    return result[0] if result else None
+    return [record[0] for record in result] if result else []
+
+# Декоратор для обработки Inline-кнопок
+@bot.callback_query_handler(func=lambda call: call.data.startswith('class_') or call.data == 'choose_class')
+def handle_class_selection(call):
+    user_id = call.from_user.id
+
+    # Если нажата кнопка "Выбрать еще один класс", вызываем функцию выбора класса
+    if call.data == 'choose_class':
+        choose_class(call.message)
+    else:
+        # Если выбран конкретный класс, создаем кнопки для подтверждения и выбора еще одного класса
+        selected_class = call.data.split('_')[1]
+
+        confirm_button = types.InlineKeyboardButton("Подтвердить выбор", callback_data=f"confirm_{selected_class}")
+        choose_another_button = types.InlineKeyboardButton("Выбрать еще один класс", callback_data="choose_class")
+
+        confirm_keyboard = types.InlineKeyboardMarkup(row_width=2)
+        confirm_keyboard.add(confirm_button, choose_another_button)
+
+        # Сохраняем состояние пользователя (выбранный класс)
+        save_user_state(user_id, selected_class)
+
+        # Отправляем сообщение с клавиатурой для подтверждения выбора
+        bot.send_message(call.message.chat.id, f"Вы выбрали класс: {selected_class}", reply_markup=confirm_keyboard)
+
+# Логика обработки выбора класса
+def handle_class_selection(chat_id, selected_classes):
+    # Получаем список учеников для выбранных классов
+    students_for_classes = get_students_for_classes(selected_classes)
+
+    # Отправляем список учеников учителю
+    bot.send_message(chat_id, f"Список учеников в выбранных классах:\n" + "\n".join(students_for_classes))
+
+# Получение списка учеников для выбранных классов
+def get_students_for_classes(selected_classes):
+    class_column = worksheet.col_values(2)[1:]
+    name_column = worksheet.col_values(1)[1:]
+
+    students_for_classes = [name_column[i] for i in range(len(class_column)) if class_column[i] in selected_classes]
+    return students_for_classes
+
 # Декоратор для обработки команды /start
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -102,29 +145,6 @@ def get_students_for_class(selected_class):
     # Возвращаем отсортированный список имен учеников
     return [student[0] for student in sorted_students]
 
-# Декоратор для обработки Inline-кнопок
-@bot.callback_query_handler(func=lambda call: call.data.startswith('class_') or call.data == 'choose_class')
-def handle_class_selection(call):
-    user_id = call.from_user.id
-
-    # Если нажата кнопка "Выбрать еще один класс", вызываем функцию выбора класса
-    if call.data == 'choose_class':
-        choose_class(call.message)
-    else:
-        # Если выбран конкретный класс, создаем кнопки для подтверждения и выбора еще одного класса
-        selected_class = call.data.split('_')[1]
-
-        confirm_button = types.InlineKeyboardButton("Подтвердить выбор", callback_data=f"confirm_{selected_class}")
-        choose_another_button = types.InlineKeyboardButton("Выбрать еще один класс", callback_data="choose_class")
-
-        confirm_keyboard = types.InlineKeyboardMarkup(row_width=2)
-        confirm_keyboard.add(confirm_button, choose_another_button)
-
-        # Сохраняем состояние пользователя (выбранный класс)
-        save_user_state(user_id, selected_class)
-
-        # Отправляем сообщение с клавиатурой для подтверждения выбора
-        bot.send_message(call.message.chat.id, f"Вы выбрали класс: {selected_class}", reply_markup=confirm_keyboard)
 
 # Декоратор для обработки подтверждения выбора
 @bot.callback_query_handler(func=lambda call: call.data.startswith('confirm_'))
@@ -146,9 +166,10 @@ def choose_class(message):
     user_id = message.from_user.id
 
     # Загружаем состояние пользователя (выбранную параллель и класс)
-    selected_parallel = load_user_state(user_id)
+    selected_classes = load_user_states(user_id)
 
-    if selected_parallel:
+
+    if selected_classes:
         # Если есть выбранная параллель, показываем ее
         bot.send_message(chat_id, f"Ваша текущая параллель: {selected_parallel}")
         # Получаем список уникальных классов для выбранной параллели
