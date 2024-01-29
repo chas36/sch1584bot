@@ -53,6 +53,40 @@ def load_user_state(user_id):
     result = cursor.fetchone()
     conn.close()
     return result[0] if result else None
+# Декоратор для обработки команды /start
+@bot.message_handler(commands=['start'])
+def start(message):
+    chat_id = message.chat.id
+
+    # Приветственный текст
+    welcome_text = (
+        "Привет! Это бот школы 1584 для классных руководителей. Он предназначен для оповещения об отсутствующих учениках. "
+        "Для начала использования, вам необходимо пройти регистрацию.\n\n"
+        "Доступные команды:\n"
+        "/choose_class - выбрать свой класс и начать работу с ботом\n"
+        "/help - получить список доступных команд\n\n"
+        "По всем вопросам обращайтесь к @ascher_work"
+    )
+
+    # Отправляем приветственное сообщение
+    bot.send_message(chat_id, welcome_text)
+
+
+# Декоратор для обработки команды /help
+@bot.message_handler(commands=['help'])
+def help_command(message):
+    chat_id = message.chat.id
+
+    # Список доступных команд
+    commands_text = (
+        "Доступные команды:\n"
+        "/choose_class - выбрать свой класс и начать работу с ботом\n"
+        "/help - получить список доступных команд\n\n"
+        "По всем вопросам обращайтесь к @ascher_work"
+    )
+
+    # Отправляем сообщение со списком команд
+    bot.send_message(chat_id, commands_text)
 
 
 # Декоратор для команды "choose_class"
@@ -156,13 +190,19 @@ def handle_class_selection(chat_id, selected_class):
     # Отправляем список учеников учителю
     bot.send_message(chat_id, f"Список учеников в классе {selected_class}:\n" + "\n".join(students_for_class))
 
-# Получение списка учеников для выбранного класса
 def get_students_for_class(selected_class):
     class_column = worksheet.col_values(2)[1:]
-    name_column = worksheet.col_values(1)[1:]  # Предполагаем, что ФИО учеников находятся в первом столбце, начиная со второй строки
+    name_column = worksheet.col_values(1)[1:]
 
-    students_for_class = [name_column[i] for i in range(len(class_column)) if class_column[i] == selected_class]
-    return students_for_class
+    # Получаем индексы учеников для выбранного класса
+    indices = [i for i, class_name in enumerate(class_column) if class_name == selected_class]
+
+    # Сортируем учеников по алфавиту на основе их индексов
+    sorted_students = sorted([(name_column[i], i) for i in indices])
+
+    # Возвращаем отсортированный список имен учеников
+    return [student[0] for student in sorted_students]
+
 
 if __name__ == "__main__":
     # Создаем таблицы в базе данных, если их нет
