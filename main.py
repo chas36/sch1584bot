@@ -3,15 +3,15 @@ import gspread
 import sqlite3
 from oauth2client.service_account import ServiceAccountCredentials
 from telebot import types
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CallbackQueryHandler
+#from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+#from telegram.ext import CallbackQueryHandler
 
 # Инициализация бота
 bot = telebot.TeleBot('6332665358:AAHXpmnyWO4yKza0GAvgcy6nCFVwETs1aaA')
 
 # Подключение к Google Sheets
 scope = 'https://spreadsheets.google.com/feeds https://www.googleapis.com/auth/drive'
-credentials = ServiceAccountCredentials.from_json_keyfile_name(r"C:\Users\Анд\PycharmProjects\sch1584bot1\sch1584-0b47bcc851fb.json", scope)
+credentials = ServiceAccountCredentials.from_json_keyfile_name(r"C:\Users\Пользователь\PycharmProjects\sch1584bot\sch1584-0b47bcc851fb.json", scope)
 
 gc = gspread.authorize(credentials)
 
@@ -270,10 +270,25 @@ def handle_text(message):
         bot.send_message(chat_id, "Пожалуйста, выберите свой класс с помощью команды /choose_class")
 
 
-# Запуск бота
-if __name__ == "__main__":
-    # Создаем таблицы в базе данных, если их нет
-    create_tables()
+# Получение списка всех пользователей с выбранными классами
+def get_users_with_classes():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT user_id FROM user_states")
+    users = cursor.fetchall()
+    conn.close()
+    return [user[0] for user in users]
 
-    # Запуск бота
+# Отправка сообщения всем пользователям
+def send_reminder_to_users(message):
+    users = get_users_with_classes()
+    for user_id in users:
+        bot.send_message(user_id, message)
+
+
+
+# Отправка напоминания всем пользователям при запуске бота
+if __name__ == "__main__":
+    reminder_message = "Напоминание: Пожалуйста, отправьте список отсутствующих детей в выбранном классе."
+    send_reminder_to_users(reminder_message)
     bot.polling(none_stop=True)
