@@ -1,9 +1,9 @@
-import database
 import sqlite3
 from telebot import types
 #from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 #from telegram.ext import CallbackQueryHandler
 from bot_initialization import bot, gc, spreadsheet_id,worksheet
+from database import create_tables, load_user_states, save_user_state, get_users_with_classes
 
 # Имя файла базы данных SQLite
 DB_FILE = 'user_states.db'
@@ -219,16 +219,6 @@ def handle_text(message):
         # Логика обработки других сообщений, если не выбран класс
         bot.send_message(chat_id, "Пожалуйста, выберите свой класс с помощью команды /choose_class")
 
-
-# Получение списка всех пользователей с выбранными классами
-def get_users_with_classes():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT user_id FROM user_states")
-    users = cursor.fetchall()
-    conn.close()
-    return [user[0] for user in users]
-
 # Отправка сообщения всем пользователям
 def send_reminder_to_users(message):
     users = get_users_with_classes()
@@ -298,6 +288,10 @@ def handle_mark_absent(call):
 
 # Отправка сообщения всем пользователям при запуске бота
 if __name__ == "__main__":
+    # Создаем таблицы в базе данных, если их нет
+    create_tables()
+
     reminder_message = "Напоминание: Пожалуйста, отправьте список отсутствующих детей в выбранном классе."
+
     send_reminder_to_users(reminder_message)
     bot.polling(none_stop=True)

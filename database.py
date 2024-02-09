@@ -35,3 +35,12 @@ def save_user_state(user_id, selected_class):
     ''', (user_id, selected_class))
     conn.commit()
     conn.close()
+
+# Получение списка всех пользователей с выбранными классами
+def get_users_with_classes():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT user_id FROM user_states")
+    users = cursor.fetchall()
+    conn.close()
+    return [user[0] for user in users]
