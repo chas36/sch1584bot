@@ -1,62 +1,12 @@
-import telebot
-import gspread
+import database
 import sqlite3
-from oauth2client.service_account import ServiceAccountCredentials
 from telebot import types
 #from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 #from telegram.ext import CallbackQueryHandler
-
-# Инициализация бота
-bot = telebot.TeleBot('6332665358:AAHXpmnyWO4yKza0GAvgcy6nCFVwETs1aaA')
-
-# Подключение к Google Sheets
-scope = 'https://spreadsheets.google.com/feeds https://www.googleapis.com/auth/drive'
-credentials = ServiceAccountCredentials.from_json_keyfile_name(r"C:\Users\Пользователь\PycharmProjects\sch1584bot\sch1584-0b47bcc851fb.json", scope)
-
-gc = gspread.authorize(credentials)
-
-# ID вашей таблицы
-spreadsheet_id = '1dA-RLiyEI3MtV5uFNvEIGG913b_HtAy18gGxkXt1JWI'
-
-# Откройте таблицу
-worksheet = gc.open_by_key(spreadsheet_id).sheet1  # Предполагается, что данные в первом листе
+from bot_initialization import bot, gc, spreadsheet_id,worksheet
 
 # Имя файла базы данных SQLite
 DB_FILE = 'user_states.db'
-
-def create_tables():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS user_states (
-            user_id INTEGER,
-            selected_class TEXT,
-            PRIMARY KEY (user_id, selected_class)
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-# Функция для загрузки всех выбранных классов для пользователя
-def load_user_states(user_id):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT selected_class FROM user_states WHERE user_id = ?
-    ''', (user_id,))
-    results = cursor.fetchall()
-    conn.close()
-    return [result[0] for result in results] if results else []
-
-# Ваша существующая функция для сохранения состояния пользователя
-def save_user_state(user_id, selected_class):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT OR REPLACE INTO user_states (user_id, selected_class) VALUES (?, ?)
-    ''', (user_id, selected_class))
-    conn.commit()
-    conn.close()
 
 # Декоратор для обработки Inline-кнопок
 @bot.callback_query_handler(func=lambda call: call.data.startswith('class_') or call.data == 'choose_class')
@@ -285,9 +235,68 @@ def send_reminder_to_users(message):
     for user_id in users:
         bot.send_message(user_id, message)
 
+# Декоратор для команды /send_absent_list
+@bot.message_handler(commands=['send_absent_list'])
+def send_absent_list(message):
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+
+    # Получаем список классов пользователя
+    user_classes = get_user_classes(user_id)
+
+    if len(user_classes) == 1:
+        # Если у пользователя один класс, отображаем список учеников этого класса с возможностью отметки отсутствующих
+        class_name = user_classes[0]
+        students = get_students_for_class(class_name)
+        keyboard = generate_absent_list_keyboard(students)
+        bot.send_message(chat_id, f"Выберите отсутствующих учеников в классе {class_name}:", reply_markup=keyboard)
+    elif len(user_classes) > 1:
+        # Если у пользователя несколько классов, отображаем кнопки со всеми его классами для выбора
+        keyboard = generate_class_selection_keyboard(user_classes)
+        bot.send_message(chat_id, "Выберите класс:", reply_markup=keyboard)
+    else:
+        bot.send_message(chat_id, "У вас нет выбранных классов.")
+
+# Генерация клавиатуры для выбора класса
+def generate_class_selection_keyboard(classes):
+    keyboard = types.InlineKeyboardMarkup()
+    for class_name in classes:
+        button = types.InlineKeyboardButton(class_name, callback_data=f"select_class_{class_name}")
+        keyboard.add(button)
+    return keyboard
+
+# Обработчик для выбора класса
+@bot.callback_query_handler(func=lambda call: call.data.startswith('select_class_'))
+def handle_class_selection(call):
+    user_id = call.from_user.id
+    selected_class = call.data.split('_')[1]
+
+    # Получаем список учеников выбранного класса с возможностью отметки отсутствующих
+    students = get_students_for_class(selected_class)
+    keyboard = generate_absent_list_keyboard(students)
+
+    # Отправляем сообщение с возможностью отметки отсутствующих учеников
+    bot.send_message(call.message.chat.id, f"Выберите отсутствующих учеников в классе {selected_class}:", reply_markup=keyboard)
+
+# Генерация клавиатуры для отметки отсутствующих учеников
+def generate_absent_list_keyboard(students):
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    for student in students:
+        button = types.InlineKeyboardButton(student, callback_data=f"mark_absent_{student}")
+        keyboard.add(button)
+    return keyboard
+
+# Обработчик для отметки отсутствующего ученика
+@bot.callback_query_handler(func=lambda call: call.data.startswith('mark_absent_'))
+def handle_mark_absent(call):
+    student_name = call.data.split('_')[1]
+    # Здесь можно добавить логику для отметки отсутствующего ученика, например, запись в базу данных или отправку уведомления
+
+    # Отправляем сообщение об успешной отметке
+    bot.answer_callback_query(callback_query_id=call.id, text=f"{student_name} отмечен как отсутствующий.")
 
 
-# Отправка напоминания всем пользователям при запуске бота
+# Отправка сообщения всем пользователям при запуске бота
 if __name__ == "__main__":
     reminder_message = "Напоминание: Пожалуйста, отправьте список отсутствующих детей в выбранном классе."
     send_reminder_to_users(reminder_message)
