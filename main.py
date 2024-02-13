@@ -255,11 +255,57 @@ def show_students_for_class(chat_id, selected_class):
         markup.row(*buttons[i:i + 2])
     bot.send_message(chat_id, "Отметьте отсутствующих учеников:", reply_markup=markup)
 
-
 @bot.callback_query_handler(func=lambda call: call.data.startswith('select_class_'))
 def handle_select_class(call):
     class_name = call.data.split('select_class_')[1]
     show_students_for_class(call.message.chat.id, class_name)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('absent_'))
+def handle_student_absent(call):
+    markup = types.InlineKeyboardMarkup()
+    # Явно добавляем кнопки парами в ряды
+    reasons = ["Семейные обстоятельства", "По болезни", "Придет к ... уроку"]
+    buttons = [types.InlineKeyboardButton(text=reason, callback_data=f"reason_{reason}") for reason in reasons]
+    # Добавляем первые две кнопки
+    markup.row(buttons[0], buttons[1])
+    # Третья кнопка в новом ряду
+    markup.row(buttons[2])
+    bot.send_message(call.message.chat.id, "Выберите причину отсутствия:", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('reason_'))
+def handle_absence_reason(call):
+    markup = types.InlineKeyboardMarkup()
+    # Для уроков добавляем кнопки парами в ряды
+    for lesson_number in range(2, 7, 2):  # Начинаем с 2 и до 6 включительно, шаг 2
+        row_buttons = []
+        for n in range(lesson_number, min(lesson_number + 2, 7)):  # Добавляем две кнопки в ряд
+            row_buttons.append(types.InlineKeyboardButton(text=str(n), callback_data=f"lesson_{n}"))
+        markup.row(*row_buttons)  # Распаковываем список кнопок в аргументы метода row
+    bot.send_message(call.message.chat.id, "Выберите, к какому уроку придет ученик:", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('lesson_'))
+def handle_lesson_number(call):
+    _, student_id, lesson_number = call.data.split('_', 2)
+    # Обработайте отсутствие ученика с указанием номера урока (необходимо реализовать)
+    handle_absence_with_lesson(student_id, lesson_number)
+
+def get_student_name_by_id(student_id):
+    # Здесь должен быть код для поиска студента по ID и возврата "Фамилия И.О."
+    # Этот пример использует словарь для демонстрации. Вам нужно будет адаптировать это под вашу структуру данных.
+    students_dict = {'1': 'Иванов И.П.', '2': 'Петров П.Д.'}  # Примерный словарь
+    return students_dict.get(student_id, "Неизвестный ученик")
+
+def handle_absence(student_id, reason):
+    # Обработка отсутствия по выбранной причине
+    print(f"Ученик {get_student_name_by_id(student_id)} отсутствует по причине: {reason}")
+    # Здесь можно добавить логику записи в базу данных или другие действия
+
+def handle_absence_with_lesson(student_id, lesson_number):
+    # Обработка отсутствия ученика с указанием номера урока
+    print(f"Ученик {get_student_name_by_id(student_id)} придет к {lesson_number} уроку")
+    # Здесь также можно добавить логику записи в базу данных или другие действия
+
+
 
 # Отправка сообщения всем пользователям при запуске бота
 if __name__ == "__main__":
