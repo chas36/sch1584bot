@@ -17,6 +17,7 @@ def create_tables():
 
 # Функция для загрузки всех выбранных классов для пользователя
 def load_user_states(user_id):
+    """Загрузка всех выбранных классов для пользователя"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''
@@ -42,5 +43,6 @@ def get_users_with_classes():
     cursor = conn.cursor()
     cursor.execute("SELECT DISTINCT user_id FROM user_states")
     users = cursor.fetchall()
+    print("Users with classes:", [user[0] for user in users])  # Добавляем логирование для отладки
     conn.close()
     return [user[0] for user in users]

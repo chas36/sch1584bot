@@ -2,7 +2,7 @@ import sqlite3
 from telebot import types
 #from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 #from telegram.ext import CallbackQueryHandler
-from bot_initialization import bot, gc, spreadsheet_id,worksheet
+from bot_initialization import bot, gc, spreadsheet_id, worksheet
 from database import create_tables, load_user_states, save_user_state, get_users_with_classes
 
 # Имя файла базы данных SQLite
@@ -46,12 +46,22 @@ def handle_class_selection(chat_id, user_id):
 
 
 # Получение списка учеников для выбранных классов
-def get_students_for_classes(selected_classes):
-    class_column = worksheet.col_values(2)[1:]
-    name_column = worksheet.col_values(1)[1:]
+def get_students_for_class(selected_class):
+    class_column = worksheet.col_values(2)[1:]  # Классы находятся во втором столбце
+    full_name_column = worksheet.col_values(1)[1:]  # Полные имена учеников в первом столбце
+    user_id_column = worksheet.col_values(3)[1:]  # ID пользователя в третьем столбце
 
-    students_for_classes = [name_column[i] for i in range(len(class_column)) if class_column[i] in selected_classes]
-    return students_for_classes
+    students = []
+    for full_name, class_name, user_id in zip(full_name_column, class_column, user_id_column):
+        if class_name == selected_class:
+            name_parts = full_name.split()  # Разделяем полное имя на части
+            if len(name_parts) == 3:  # Убедимся, что есть фамилия, имя и отчество
+                short_name = f"{name_parts[0]} {name_parts[1][0]}.{name_parts[2][0]}."  # Сокращаем до "Фамилия И.О."
+                students.append((user_id, short_name))  # Сначала идентификатор, потом "Фамилия И.О."
+            else:
+                students.append((full_name, user_id))  # Если формат отличается, используем полное имя
+
+    return students
 
 # Декоратор для обработки команды /start
 @bot.message_handler(commands=['start'])
@@ -87,19 +97,6 @@ def help_command(message):
 
     # Отправляем сообщение со списком команд
     bot.send_message(chat_id, commands_text)
-
-def get_students_for_class(selected_class):
-    class_column = worksheet.col_values(2)[1:]
-    name_column = worksheet.col_values(1)[1:]
-
-    # Получаем индексы учеников для выбранного класса
-    indices = [i for i, class_name in enumerate(class_column) if class_name == selected_class]
-
-    # Сортируем учеников по алфавиту на основе их индексов
-    sorted_students = sorted([(name_column[i], i) for i in indices])
-
-    # Возвращаем отсортированный список имен учеников
-    return [student[0] for student in sorted_students]
 
 # Декоратор для команды "/my_classes"
 @bot.message_handler(commands=['my_classes'])
@@ -219,79 +216,54 @@ def handle_text(message):
         # Логика обработки других сообщений, если не выбран класс
         bot.send_message(chat_id, "Пожалуйста, выберите свой класс с помощью команды /choose_class")
 
-# Отправка сообщения всем пользователям
-def send_reminder_to_users(message):
-    users = get_users_with_classes()
+def send_reminders():
+    users = get_users_with_classes()  # Получаем список пользователей с выбранными классами
     for user_id in users:
-        bot.send_message(user_id, message)
+        markup = types.InlineKeyboardMarkup()
+        reminder_button = types.InlineKeyboardButton("Отправить список отсутствующих", callback_data="send_absent_list")
+        markup.add(reminder_button)
+        bot.send_message(user_id, "Напоминание: Пожалуйста, отправьте список отсутствующих детей в выбранном классе.", reply_markup=markup)
 
-# Декоратор для команды /send_absent_list
-@bot.message_handler(commands=['send_absent_list'])
-def send_absent_list(message):
-    chat_id = message.chat.id
-    user_id = message.from_user.id
-
-    # Получаем список классов пользователя
-    user_classes = get_user_classes(user_id)
-
-    if len(user_classes) == 1:
-        # Если у пользователя один класс, отображаем список учеников этого класса с возможностью отметки отсутствующих
-        class_name = user_classes[0]
-        students = get_students_for_class(class_name)
-        keyboard = generate_absent_list_keyboard(students)
-        bot.send_message(chat_id, f"Выберите отсутствующих учеников в классе {class_name}:", reply_markup=keyboard)
-    elif len(user_classes) > 1:
-        # Если у пользователя несколько классов, отображаем кнопки со всеми его классами для выбора
-        keyboard = generate_class_selection_keyboard(user_classes)
-        bot.send_message(chat_id, "Выберите класс:", reply_markup=keyboard)
-    else:
-        bot.send_message(chat_id, "У вас нет выбранных классов.")
-
-# Генерация клавиатуры для выбора класса
-def generate_class_selection_keyboard(classes):
-    keyboard = types.InlineKeyboardMarkup()
-    for class_name in classes:
-        button = types.InlineKeyboardButton(class_name, callback_data=f"select_class_{class_name}")
-        keyboard.add(button)
-    return keyboard
-
-# Обработчик для выбора класса
-@bot.callback_query_handler(func=lambda call: call.data.startswith('select_class_'))
-def handle_class_selection(call):
+@bot.callback_query_handler(func=lambda call: call.data == "send_absent_list")
+def handle_send_absent_list(call):
     user_id = call.from_user.id
-    selected_class = call.data.split('_')[1]
+    user_classes = load_user_states(user_id)
+    if len(user_classes) > 1:
+        # Показываем кнопки со всеми классами пользователя
+        show_classes_to_user(call.message.chat.id, user_classes)
+    elif len(user_classes) == 1:
+        # Показываем список учеников одного класса
+        show_students_for_class(call.message.chat.id, user_classes[0])
+    else:
+        bot.answer_callback_query(call.id, "У вас нет выбранных классов.")
 
-    # Получаем список учеников выбранного класса с возможностью отметки отсутствующих
-    students = get_students_for_class(selected_class)
-    keyboard = generate_absent_list_keyboard(students)
+def show_classes_to_user(chat_id, user_classes):
+    markup = types.InlineKeyboardMarkup()
+    for user_class in user_classes:
+        button = types.InlineKeyboardButton(user_class, callback_data=f"class_{user_class}")
+        markup.add(button)
+    bot.send_message(chat_id, "Выберите класс:", reply_markup=markup)
 
-    # Отправляем сообщение с возможностью отметки отсутствующих учеников
-    bot.send_message(call.message.chat.id, f"Выберите отсутствующих учеников в классе {selected_class}:", reply_markup=keyboard)
+def show_students_for_class(chat_id, selected_class):
+    students = get_students_for_class(selected_class)  # Должна возвращать список кортежей (id, "Фамилия И.О.")
+    markup = types.InlineKeyboardMarkup()
+    for student_id, short_name in students:
+        # Используйте short_name для текста кнопки, а student_id для callback_data
+        button = types.InlineKeyboardButton(short_name, callback_data=f"absent_{student_id}")
+        markup.add(button)
+    bot.send_message(chat_id, "Отметьте отсутствующих учеников:", reply_markup=markup)
 
-# Генерация клавиатуры для отметки отсутствующих учеников
-def generate_absent_list_keyboard(students):
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    for student in students:
-        button = types.InlineKeyboardButton(student, callback_data=f"mark_absent_{student}")
-        keyboard.add(button)
-    return keyboard
 
-# Обработчик для отметки отсутствующего ученика
-@bot.callback_query_handler(func=lambda call: call.data.startswith('mark_absent_'))
-def handle_mark_absent(call):
-    student_name = call.data.split('_')[1]
-    # Здесь можно добавить логику для отметки отсутствующего ученика, например, запись в базу данных или отправку уведомления
-
-    # Отправляем сообщение об успешной отметке
-    bot.answer_callback_query(callback_query_id=call.id, text=f"{student_name} отмечен как отсутствующий.")
-
+@bot.callback_query_handler(func=lambda call: call.data.startswith('select_class_'))
+def handle_select_class(call):
+    class_name = call.data.split('select_class_')[1]
+    show_students_for_class(call.message.chat.id, class_name)
 
 # Отправка сообщения всем пользователям при запуске бота
 if __name__ == "__main__":
     # Создаем таблицы в базе данных, если их нет
     create_tables()
 
-    reminder_message = "Напоминание: Пожалуйста, отправьте список отсутствующих детей в выбранном классе."
+    send_reminders()
 
-    send_reminder_to_users(reminder_message)
     bot.polling(none_stop=True)
