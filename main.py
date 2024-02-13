@@ -245,12 +245,14 @@ def show_classes_to_user(chat_id, user_classes):
     bot.send_message(chat_id, "Выберите класс:", reply_markup=markup)
 
 def show_students_for_class(chat_id, selected_class):
-    students = get_students_for_class(selected_class)  # Должна возвращать список кортежей (id, "Фамилия И.О.")
+    students = get_students_for_class(selected_class)  # Предполагается, что функция возвращает список (user_id, "Фамилия И.О.")
+    # Создание инлайн-клавиатуры с тремя кнопками в ряду явным образом
     markup = types.InlineKeyboardMarkup()
-    for student_id, short_name in students:
-        # Используйте short_name для текста кнопки, а student_id для callback_data
-        button = types.InlineKeyboardButton(short_name, callback_data=f"absent_{student_id}")
-        markup.add(button)
+    # Предположим, у нас есть список кнопок buttons
+    buttons = [types.InlineKeyboardButton(short_name, callback_data=f"absent_{user_id}") for user_id, short_name in
+               students]
+    for i in range(0, len(buttons), 2):
+        markup.row(*buttons[i:i + 2])
     bot.send_message(chat_id, "Отметьте отсутствующих учеников:", reply_markup=markup)
 
 
