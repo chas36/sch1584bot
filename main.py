@@ -1,8 +1,7 @@
-import sqlite3
 from telebot import types
-#from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-#from telegram.ext import CallbackQueryHandler
-from bot_initialization import bot, gc, spreadsheet_id, worksheet, RECIPIENT_CHAT_ID
+import pytz
+from datetime import datetime
+from bot_initialization import bot, worksheet, RECIPIENT_CHAT_ID
 from database import create_tables, load_user_states, save_user_state, get_users_with_classes
 
 # Имя файла базы данных SQLite
@@ -276,12 +275,23 @@ def show_students_for_class(chat_id, selected_class):
 
 @bot.callback_query_handler(func=lambda call: call.data == "all_present")
 def handle_all_present(call):
-    bot.edit_message_text(
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        text="Отмечено, что все ученики присутствуют.",
-        reply_markup=None  # Удаление клавиатуры
-    )
+    user_id = call.from_user.id
+    selected_classes = load_user_states(user_id)
+    if selected_classes:
+        selected_class = selected_classes[0]  # Предполагается, что у пользователя только один класс
+
+        # Обновление словаря absences, указывая, что отсутствующих нет
+        absences[selected_class] = [{"name": "<i>Нет отсутствующих</i>", "reason": ""}]
+
+        # Опционально: удаление предыдущих сообщений с кнопками
+        # bot.delete_message(chat_id=call.message.chat.id, message_id=PREVIOUS_MESSAGE_ID)
+
+        # Вызов функции finish_absence_list или отправка сообщения для ее вызова
+        # Для прямого вызова:
+        handle_finish_absence_list(call)
+
+        # Если функция finish_absence_list ожидает другие параметры, адаптируйте вызов
+
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('select_class_'))
 def handle_select_class(call):
@@ -418,18 +428,28 @@ def mark_student_absent(call):
     # Сортировка списка отсутствующих в классе
     absences[class_name] = sorted(absences[class_name], key=lambda x: x[0])
 
+
 @bot.callback_query_handler(func=lambda call: call.data == "finish_absence_list")
 def handle_finish_absence_list(call):
     user_id = call.from_user.id
     selected_classes = load_user_states(user_id)
 
     if selected_classes:
-        selected_class = selected_classes[0]  # Предполагаем, что у пользователя может быть только один класс
-        # Далее идет логика работы с absences и вызов send_absence_list_to_recipient
-        if selected_class in absences:
-            absence_list = absences[selected_class]
-            send_absence_list_to_recipient(selected_class, absence_list)
-            bot.send_message(call.message.chat.id, "Список отсутствующих учеников успешно отправлен.")
+        selected_class = selected_classes[0]  # Предполагается один класс для пользователя
+        if selected_class in absences and absences[selected_class]:
+            # Отправка списка отсутствующих и удаление предыдущих сообщений
+            send_absence_list_to_recipient(selected_class, absences[selected_class])
+            # Пример удаления предыдущего сообщения (нужно знать его message_id)
+            # bot.delete_message(chat_id=call.message.chat.id, message_id=MESSAGE_ID)
+
+            # Итоговое сообщение с датой и временем
+            timezone = pytz.timezone('Europe/Moscow')
+            now = datetime.now(timezone).strftime("%d.%m.%Y %H:%M")
+            bot.send_message(call.message.chat.id,
+                             f"Список отсутствующих учеников в {selected_class} классе успешно отправлен {now}.")
+
+            # Очистка списка после отправки
+            absences[selected_class] = []
         else:
             bot.send_message(call.message.chat.id, "Список отсутствующих учеников пуст.")
     else:
