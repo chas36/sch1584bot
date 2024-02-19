@@ -382,22 +382,24 @@ def handle_come_to_lesson(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('lesson_'))
 def handle_lesson_selection(call):
     _, student_id, lesson_number = call.data.split('_')
-    student_name = get_student_name_by_id(student_id)  # Используйте вашу реализацию этой функции
+    student_name = get_student_name_by_id(student_id)  # Получение имени ученика
+    class_name = get_class_by_student_id(student_id)  # Получение класса ученика
+
+    # Формирование записи о том, что ученик придет к указанному уроку
+    reason = f"Придет к {lesson_number} уроку"
+
+    # Добавление записи в словарь absences
+    if class_name not in absences:
+        absences[class_name] = []
+    absences[class_name].append({"name": student_name, "reason": reason})
+
+    # Сообщение пользователю о сохранении информации
     bot.edit_message_text(
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
         text=f"Отмечено отсутствие: {student_name} Придет к {lesson_number} уроку",
         reply_markup=None  # Удаление клавиатуры
     )
-@bot.callback_query_handler(func=lambda call: call.data.startswith("lesson_"))
-def handle_lesson_selection(call):
-    selected_lesson = call.data.split("_")[1]  # Извлечение номера урока из callback_data
-    user_id = call.from_user.id
-    # Сохраняем информацию об отсутствии с указанием выбранного урока (реализуйте эту функцию)
-    save_absence_info(user_id, f"Придет к {selected_lesson} уроку")
-
-    # Отправляем подтверждение пользователю
-    bot.send_message(call.message.chat.id, f"Записано: придет к {selected_lesson} уроку.")
 
 
 # Обработчик для отметки ученика как отсутствующего
@@ -410,6 +412,7 @@ def mark_student_absent(call):
     # Добавление ученика в список отсутствующих
     if class_name not in absences:
         absences[class_name] = []
+
     absences[class_name].append((student_name, reason))
 
     # Сортировка списка отсутствующих в классе
@@ -434,12 +437,22 @@ def handle_finish_absence_list(call):
 
 
 def send_absence_list_to_recipient(selected_class, absence_list):
-    message_text = f"Класс {selected_class}, список отсутствующих:\n" + "\n".join([f"{student['name']} - {student['reason']}" for student in absence_list])
-    if not absence_list:
+    # Сортировка списка отсутствующих учеников по алфавиту по имени
+    sorted_absence_list = sorted(absence_list, key=lambda x: x['name'])
+
+    # Формирование текста сообщения
+    message_text = f"<b>{selected_class}</b>, список отсутствующих:\n"
+    for student in sorted_absence_list:
+        message_text += f"{student['name']} - {student['reason']}\n"
+
+    if not sorted_absence_list:
         message_text = f"Класс {selected_class}, отсутствующих учеников нет."
-    print(f"Отсутствующие ученики класса {selected_class}: {absences.get(selected_class)}")
+
     print(message_text)
-    bot.send_message(RECIPIENT_CHAT_ID, message_text)
+
+    # Отправка сообщения
+    bot.send_message(RECIPIENT_CHAT_ID, message_text, parse_mode='HTML')
+
 
 @bot.message_handler(func=lambda message: True)
 def echo_all(message):
