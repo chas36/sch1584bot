@@ -2,7 +2,7 @@ import sqlite3
 from telebot import types
 #from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 #from telegram.ext import CallbackQueryHandler
-from bot_initialization import bot, gc, spreadsheet_id, worksheet,RECIPIENT_CHAT_ID
+from bot_initialization import bot, gc, spreadsheet_id, worksheet, RECIPIENT_CHAT_ID
 from database import create_tables, load_user_states, save_user_state, get_users_with_classes
 
 # Имя файла базы данных SQLite
@@ -69,6 +69,10 @@ def get_students_for_class(selected_class):
 @bot.message_handler(commands=['start'])
 def start(message):
     chat_id = message.chat.id
+    # Создание Reply клавиатуры
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    # Добавление кнопки "Выбрать класс"
+    markup.add(types.KeyboardButton("Выбрать класс"))
 
     # Приветственный текст
     welcome_text = (
@@ -81,7 +85,8 @@ def start(message):
     )
 
     # Отправляем приветственное сообщение
-    bot.send_message(chat_id, welcome_text)
+    bot.send_message(chat_id, welcome_text, reply_markup=markup)
+    print(message.chat.id)  # Вывод chat_id в консоль
 
 
 # Декоратор для обработки команды /help
@@ -134,7 +139,8 @@ def handle_confirm_selection(call):
 
 
 # Декоратор для команды "choose_class"
-@bot.message_handler(commands=['choose_class'])
+# Обработчик текстовых сообщений для обработки нажатия кнопки "Выбрать класс"
+@bot.message_handler(func=lambda message: message.text == "Выбрать класс")
 def choose_class(message):
     chat_id = message.chat.id
     user_id = message.from_user.id
@@ -248,21 +254,23 @@ def show_classes_to_user(chat_id, user_classes):
 
 
 def show_students_for_class(chat_id, selected_class):
-    students = get_students_for_class(
-        selected_class)  # Допустим, функция возвращает список кортежей (id, "Фамилия И.О.")
+    students = get_students_for_class(selected_class)  # Функция возвращает список кортежей (id, "Фамилия И.О.")
     markup = types.InlineKeyboardMarkup()
 
-    # Создаем кнопки для каждого ученика и группируем по две в ряд
-    buttons = [types.InlineKeyboardButton(f"{name}", callback_data=f"absent_{student_id}") for student_id, name in
-               students]
+    # Создание кнопок для каждого ученика
+    buttons = [types.InlineKeyboardButton(f"{name}", callback_data=f"absent_{student_id}") for student_id, name in students]
     while buttons:
-        row = buttons[:2]  # Берем первые две кнопки для текущего ряда
-        markup.row(*row)  # Добавляем ряд в клавиатуру
-        buttons = buttons[2:]  # Удаляем добавленные кнопки из списка
+        row = buttons[:2]  # Группируем по две кнопки в ряд
+        markup.row(*row)
+        buttons = buttons[2:]
 
-    # Добавляем кнопку "Все присутствуют" в новый ряд
+    # Добавляем кнопку "Все присутствуют"
     all_present_button = types.InlineKeyboardButton("Все присутствуют", callback_data="all_present")
     markup.add(all_present_button)
+
+    # Добавляем кнопку "Завершить список отсутствующих"
+    finish_list_button = types.InlineKeyboardButton("Завершить список отсутствующих", callback_data="finish_absence_list")
+    markup.add(finish_list_button)
 
     bot.send_message(chat_id, "Выберите отсутствующих учеников или нажмите 'Все присутствуют':", reply_markup=markup)
 
@@ -301,15 +309,23 @@ def handle_student_absent(call):
             reason in pair]
         markup.row(*row_buttons)
         markup.add(come_to_lesson_button)
+
     bot.send_message(call.message.chat.id,
                      f"Вы хотите отметить отсутствие ученика {student_name} Выберите причину отсутствия:",
                      reply_markup=markup)
 
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('reason_'))
 def handle_absence_reason(call):
     _, student_id, reason_code = call.data.split('_', 2)
-    reason = reason_code.replace('_', ' ')  # Восстанавливаем причину отсутствия из кода
-    student_name = get_student_name_by_id(student_id)  # Получаем имя ученика по его ID
+    reason = reason_code.replace('_', ' ')
+    student_name = get_student_name_by_id(student_id)
+    class_name = get_class_by_student_id(student_id)
+
+    if class_name not in absences:
+        absences[class_name] = []
+
+    absences[class_name].append({"name": student_name, "reason": reason})
 
     # Редактируем сообщение, обновляя текст и удаляя клавиатуру
     bot.edit_message_text(
@@ -342,14 +358,26 @@ def get_student_name_by_id(student_id):
 @bot.callback_query_handler(func=lambda call: call.data.startswith("come_to_lesson"))
 def handle_come_to_lesson(call):
     _, student_id = call.data.rsplit('_', 1)  # Используйте rsplit для корректной работы с student_id
-    lesson_numbers_markup = types.InlineKeyboardMarkup()
+
+    # Удаление предыдущего сообщения с кнопками
+    try:
+        bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+    except Exception as e:
+        print(f"Error deleting message: {e}")
+
+    # Создание новой клавиатуры с числами от 2 до 8
+    lesson_numbers_markup = types.InlineKeyboardMarkup(row_width=2)
+    buttons = []
     for i in range(2, 8):
         lesson_button = types.InlineKeyboardButton(str(i), callback_data=f"lesson_{student_id}_{i}")
-        lesson_numbers_markup.add(lesson_button)
+        buttons.append(lesson_button)
 
-    # Обновите сообщение или отправьте новое с обновленной клавиатурой
+    lesson_numbers_markup.add(*buttons)  # Добавление всех кнопок сразу
+
+    # Отправка нового сообщения с обновленной клавиатурой
     bot.send_message(call.message.chat.id, "Выберите, к какому уроку придет ученик:",
                      reply_markup=lesson_numbers_markup)
+
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('lesson_'))
 def handle_lesson_selection(call):
@@ -372,20 +400,51 @@ def handle_lesson_selection(call):
     bot.send_message(call.message.chat.id, f"Записано: придет к {selected_lesson} уроку.")
 
 
-def handle_absence(student_id, reason):
-    # Обработка отсутствия по выбранной причине
-    print(f"Ученик {get_student_name_by_id(student_id)} отсутствует по причине: {reason}")
-    # Здесь можно добавить логику записи в базу данных или другие действия
+# Обработчик для отметки ученика как отсутствующего
+@bot.callback_query_handler(func=lambda call: call.data.startswith("absent_"))
+def mark_student_absent(call):
+    _, student_id, reason = call.data.split('_')
+    student_name = get_student_name_by_id(student_id)  # Предполагаемая функция для получения имени ученика
+    class_name = get_class_by_student_id(student_id)  # Предполагаемая функция для получения класса ученика
 
-def handle_absence_with_lesson(student_id, lesson_number):
-    # Обработка отсутствия ученика с указанием номера урока
-    print(f"Ученик {get_student_name_by_id(student_id)} придет к {lesson_number} уроку")
-    # Здесь также можно добавить логику записи в базу данных или другие действия
+    # Добавление ученика в список отсутствующих
+    if class_name not in absences:
+        absences[class_name] = []
+    absences[class_name].append((student_name, reason))
 
-def send_absence_list_to_recipient(absence_list):
-    # Формирование сообщения
-    message_text = '\n'.join([f"{student['name']} {student['reason']}" for student in absence_list])
+    # Сортировка списка отсутствующих в классе
+    absences[class_name] = sorted(absences[class_name], key=lambda x: x[0])
+
+@bot.callback_query_handler(func=lambda call: call.data == "finish_absence_list")
+def handle_finish_absence_list(call):
+    user_id = call.from_user.id
+    selected_classes = load_user_states(user_id)
+
+    if selected_classes:
+        selected_class = selected_classes[0]  # Предполагаем, что у пользователя может быть только один класс
+        # Далее идет логика работы с absences и вызов send_absence_list_to_recipient
+        if selected_class in absences:
+            absence_list = absences[selected_class]
+            send_absence_list_to_recipient(selected_class, absence_list)
+            bot.send_message(call.message.chat.id, "Список отсутствующих учеников успешно отправлен.")
+        else:
+            bot.send_message(call.message.chat.id, "Список отсутствующих учеников пуст.")
+    else:
+        bot.send_message(call.message.chat.id, "Класс для пользователя не найден.")
+
+
+def send_absence_list_to_recipient(selected_class, absence_list):
+    message_text = f"Класс {selected_class}, список отсутствующих:\n" + "\n".join([f"{student['name']} - {student['reason']}" for student in absence_list])
+    if not absence_list:
+        message_text = f"Класс {selected_class}, отсутствующих учеников нет."
+    print(f"Отсутствующие ученики класса {selected_class}: {absences.get(selected_class)}")
+    print(message_text)
     bot.send_message(RECIPIENT_CHAT_ID, message_text)
+
+@bot.message_handler(func=lambda message: True)
+def echo_all(message):
+    print(message.chat.id)  # Вывод chat_id в консоль
+    bot.reply_to(message, f"Ваш chat_id: {message.chat.id}")
 
 # Отправка сообщения всем пользователям при запуске бота
 if __name__ == "__main__":
