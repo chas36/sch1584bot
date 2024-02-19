@@ -291,7 +291,8 @@ def handle_student_absent(call):
         absences[class_name] = []
 
     markup = types.InlineKeyboardMarkup()
-    reasons = ["Семейные обстоятельства", "По болезни", "Придет к ... уроку"]
+    come_to_lesson_button = types.InlineKeyboardButton("Придет к ... уроку", callback_data=f"come_to_lesson_{student_id}")
+    reasons = ["Семейные обстоятельства", "По болезни"]
     # Разбиваем список причин на пары для добавления в ряды
     reason_pairs = [reasons[i:i + 2] for i in range(0, len(reasons), 2)]
     for pair in reason_pairs:
@@ -299,8 +300,9 @@ def handle_student_absent(call):
             types.InlineKeyboardButton(reason, callback_data=f"reason_{student_id}_{reason.replace(' ', '_')}") for
             reason in pair]
         markup.row(*row_buttons)
+        markup.add(come_to_lesson_button)
     bot.send_message(call.message.chat.id,
-                     f"Вы хотите отметить отсутствие ученика {student_name}. Выберите причину отсутствия:",
+                     f"Вы хотите отметить отсутствие ученика {student_name} Выберите причину отсутствия:",
                      reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('reason_'))
@@ -316,12 +318,6 @@ def handle_absence_reason(call):
         text=f"Отмечено отсутствие: {student_name} по причине '{reason}'",
         reply_markup=None
     )
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('lesson_'))
-def handle_lesson_number(call):
-    _, student_id, lesson_number = call.data.split('_', 2)
-    # Обработайте отсутствие ученика с указанием номера урока (необходимо реализовать)
-    handle_absence_with_lesson(student_id, lesson_number)
 
 def get_class_by_student_id(student_id):
     rows = worksheet.get_all_values()
@@ -342,18 +338,18 @@ def get_student_name_by_id(student_id):
                 return f"{name_parts[0]} {name_parts[1][0]}.{name_parts[2][0]}."  # Преобразование в "Фамилия И.О."
     return "Неизвестный ученик"
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('reason_') and "Придет_к_..._уроку" in call.data)
-def handle_coming_to_lesson(call):
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    lesson_numbers = range(2, 8)  # Номера уроков от 2 до 7
-    for number in lesson_numbers:
-        markup.add(types.InlineKeyboardButton(str(number), callback_data=f"lesson_{call.data.split('_')[1]}_{number}"))
-    bot.edit_message_text(
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        text="Выберите, к какому уроку придет ученик:",
-        reply_markup=markup
-    )
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("come_to_lesson"))
+def handle_come_to_lesson(call):
+    _, student_id = call.data.rsplit('_', 1)  # Используйте rsplit для корректной работы с student_id
+    lesson_numbers_markup = types.InlineKeyboardMarkup()
+    for i in range(2, 8):
+        lesson_button = types.InlineKeyboardButton(str(i), callback_data=f"lesson_{student_id}_{i}")
+        lesson_numbers_markup.add(lesson_button)
+
+    # Обновите сообщение или отправьте новое с обновленной клавиатурой
+    bot.send_message(call.message.chat.id, "Выберите, к какому уроку придет ученик:",
+                     reply_markup=lesson_numbers_markup)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('lesson_'))
 def handle_lesson_selection(call):
@@ -362,9 +358,19 @@ def handle_lesson_selection(call):
     bot.edit_message_text(
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
-        text=f"Отмечено отсутствие: {student_name}. Придет к {lesson_number} уроку",
+        text=f"Отмечено отсутствие: {student_name} Придет к {lesson_number} уроку",
         reply_markup=None  # Удаление клавиатуры
     )
+@bot.callback_query_handler(func=lambda call: call.data.startswith("lesson_"))
+def handle_lesson_selection(call):
+    selected_lesson = call.data.split("_")[1]  # Извлечение номера урока из callback_data
+    user_id = call.from_user.id
+    # Сохраняем информацию об отсутствии с указанием выбранного урока (реализуйте эту функцию)
+    save_absence_info(user_id, f"Придет к {selected_lesson} уроку")
+
+    # Отправляем подтверждение пользователю
+    bot.send_message(call.message.chat.id, f"Записано: придет к {selected_lesson} уроку.")
+
 
 def handle_absence(student_id, reason):
     # Обработка отсутствия по выбранной причине
