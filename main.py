@@ -342,14 +342,25 @@ def get_student_name_by_id(student_id):
 @bot.callback_query_handler(func=lambda call: call.data.startswith("come_to_lesson"))
 def handle_come_to_lesson(call):
     _, student_id = call.data.rsplit('_', 1)  # Используйте rsplit для корректной работы с student_id
-    lesson_numbers_markup = types.InlineKeyboardMarkup()
+    # Удаление предыдущего сообщения с кнопками
+    try:
+        bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+    except Exception as e:
+        print(f"Error deleting message: {e}")
+
+    # Установка row_width=2 для размещения кнопок в два столбика
+    lesson_numbers_markup = types.InlineKeyboardMarkup(row_width=2)
+    buttons = []
     for i in range(2, 8):
         lesson_button = types.InlineKeyboardButton(str(i), callback_data=f"lesson_{student_id}_{i}")
-        lesson_numbers_markup.add(lesson_button)
+        buttons.append(lesson_button)
+
+    lesson_numbers_markup.add(*buttons)  # Добавление всех кнопок сразу
 
     # Обновите сообщение или отправьте новое с обновленной клавиатурой
     bot.send_message(call.message.chat.id, "Выберите, к какому уроку придет ученик:",
                      reply_markup=lesson_numbers_markup)
+
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('lesson_'))
 def handle_lesson_selection(call):
