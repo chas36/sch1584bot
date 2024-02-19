@@ -3,6 +3,7 @@ import sqlite3
 DB_FILE = 'user_states.db'
 
 def create_tables():
+    print('create_tables')
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''
@@ -17,6 +18,7 @@ def create_tables():
 
 # Функция для загрузки всех выбранных классов для пользователя
 def load_user_states(user_id):
+    print('load_user_states')
     """Загрузка всех выбранных классов для пользователя"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -29,6 +31,7 @@ def load_user_states(user_id):
 
 # Ваша существующая функция для сохранения состояния пользователя
 def save_user_state(user_id, selected_class):
+    print('save_user_state')
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''
@@ -39,6 +42,7 @@ def save_user_state(user_id, selected_class):
 
 # Получение списка всех пользователей с выбранными классами
 def get_users_with_classes():
+    print('get_users_with_classes')
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("SELECT DISTINCT user_id FROM user_states")
