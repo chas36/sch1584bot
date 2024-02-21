@@ -5,18 +5,13 @@ from bot_initialization import bot, worksheet, RECIPIENT_CHAT_ID
 from database import create_tables, load_user_states, save_user_state, get_users_with_classes
 
 # Имя файла базы данных SQLite
-DB_FILE = 'user_states.db'
+DB_FILE = 'user_states1.db'
 
 absences = {}
-# Глобальный словарь для хранения текущего класса пользователя
-current_class_selection = {}
-# Предположим, у нас есть словарь для хранения message_id сообщений, которые нужно будет удалить
-messages_to_delete = {}
 
 # Декоратор для обработки Inline-кнопок
 @bot.callback_query_handler(func=lambda call: call.data.startswith('class_') or call.data == 'choose_class')
 def handle_class_selection(call):
-    print('handle_class_selection')
     user_id = call.from_user.id
 
     # Если нажата кнопка "Выбрать еще один класс", вызываем функцию выбора класса
@@ -40,7 +35,6 @@ def handle_class_selection(call):
 
 # Логика обработки выбора класса
 def handle_class_selection(chat_id, user_id):
-    print('handle_class_selection')
     # Получаем список всех выбранных классов для данного пользователя
     selected_classes = load_user_states(user_id)
 
@@ -54,7 +48,6 @@ def handle_class_selection(chat_id, user_id):
 
 # Получение списка учеников для выбранных классов
 def get_students_for_class(selected_class):
-    print('get_students_for_class')
     class_column = worksheet.col_values(2)[1:]  # Классы находятся во втором столбце
     full_name_column = worksheet.col_values(1)[1:]  # Полные имена учеников в первом столбце
     user_id_column = worksheet.col_values(3)[1:]  # ID пользователя в третьем столбце
@@ -74,7 +67,6 @@ def get_students_for_class(selected_class):
 # Декоратор для обработки команды /start
 @bot.message_handler(commands=['start'])
 def start(message):
-    print('start')
     chat_id = message.chat.id
     # Создание Reply клавиатуры
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
@@ -85,21 +77,20 @@ def start(message):
     welcome_text = (
         "Привет! Это бот школы 1584 для классных руководителей. Он предназначен для оповещения об отсутствующих учениках. "
         "Для начала использования, вам необходимо пройти регистрацию.\n\n"
+        '''Для регистрации вам необходимо выбрать класс. <b>Для выбора класса необходимо написать "Выбрать класс" либо воспользоваться кнопкой внизу экрана</b>\n\n'''
         "Доступные команды:\n"
-        "/choose_class - выбрать свой класс и начать работу с ботом\n"
         "/help - получить список доступных команд\n\n"
         "По всем вопросам обращайтесь к @ascher_work"
     )
 
     # Отправляем приветственное сообщение
-    bot.send_message(chat_id, welcome_text, reply_markup=markup)
+    bot.send_message(chat_id, welcome_text, parse_mode='HTML', reply_markup=markup)
     print(message.chat.id)  # Вывод chat_id в консоль
 
 
 # Декоратор для обработки команды /help
 @bot.message_handler(commands=['help'])
 def help_command(message):
-    print('help_command')
     chat_id = message.chat.id
 
     # Список доступных команд
@@ -116,7 +107,6 @@ def help_command(message):
 # Декоратор для команды "/my_classes"
 @bot.message_handler(commands=['my_classes'])
 def my_classes(message):
-    print('my_classes')
     chat_id = message.chat.id
     user_id = message.from_user.id
 
@@ -132,7 +122,6 @@ def my_classes(message):
 # Декоратор для обработки подтверждения выбора
 @bot.callback_query_handler(func=lambda call: call.data.startswith('confirm_'))
 def handle_confirm_selection(call):
-    print('handle_confirm_selection')
     user_id = call.from_user.id
     selected_class = call.data.split('_')[1]
 
@@ -152,7 +141,6 @@ def handle_confirm_selection(call):
 # Обработчик текстовых сообщений для обработки нажатия кнопки "Выбрать класс"
 @bot.message_handler(func=lambda message: message.text == "Выбрать класс")
 def choose_class(message):
-    print('choose_class')
     chat_id = message.chat.id
     user_id = message.from_user.id
 
@@ -196,7 +184,6 @@ def choose_class(message):
 # Декоратор для обработки выбора параллели
 @bot.callback_query_handler(func=lambda call: call.data.startswith('parallel_'))
 def handle_parallel_selection(call):
-    print('handle_parallel_selection')
     user_id = call.from_user.id
     selected_parallel = call.data.split('_')[1]
 
@@ -223,7 +210,6 @@ def handle_parallel_selection(call):
 # Декоратор для обработки текстовых сообщений
 @bot.message_handler(content_types=['text'])
 def handle_text(message):
-    print('handle_text')
     chat_id = message.chat.id
     user_message = message.text.lower()
 
@@ -238,7 +224,6 @@ def handle_text(message):
         bot.send_message(chat_id, "Пожалуйста, выберите свой класс с помощью команды /choose_class")
 
 def send_reminders():
-    print('send_reminders')
     users = get_users_with_classes()  # Получаем список пользователей с выбранными классами
     for user_id in users:
         markup = types.InlineKeyboardMarkup()
@@ -248,7 +233,6 @@ def send_reminders():
 
 @bot.callback_query_handler(func=lambda call: call.data == "send_absent_list")
 def handle_send_absent_list(call):
-    print('handle_send_absent_list')
     user_id = call.from_user.id
     user_classes = load_user_states(user_id)
     if len(user_classes) > 1:
@@ -261,16 +245,14 @@ def handle_send_absent_list(call):
         bot.answer_callback_query(call.id, "У вас нет выбранных классов.")
 
 def show_classes_to_user(chat_id, user_classes):
-    print('show_classes_to_user')
     markup = types.InlineKeyboardMarkup()
     for user_class in user_classes:
-        button = types.InlineKeyboardButton(user_class, callback_data=f"select_class_{user_class}")
+        button = types.InlineKeyboardButton(user_class, callback_data=f"class_{user_class}")
         markup.add(button)
     bot.send_message(chat_id, "Выберите класс:", reply_markup=markup)
 
 
 def show_students_for_class(chat_id, selected_class):
-    print('show_students_for_class')
     students = get_students_for_class(selected_class)  # Функция возвращает список кортежей (id, "Фамилия И.О.")
     markup = types.InlineKeyboardMarkup()
 
@@ -293,7 +275,6 @@ def show_students_for_class(chat_id, selected_class):
 
 @bot.callback_query_handler(func=lambda call: call.data == "all_present")
 def handle_all_present(call):
-    print('handle_all_present')
     user_id = call.from_user.id
     selected_classes = load_user_states(user_id)
     if selected_classes:
@@ -311,16 +292,14 @@ def handle_all_present(call):
 
         # Если функция finish_absence_list ожидает другие параметры, адаптируйте вызов
 
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('select_class_'))
 def handle_select_class(call):
-    user_id = call.from_user.id
     class_name = call.data.split('select_class_')[1]
-    current_class_selection[user_id] = class_name  # Сохраняем текущий выбранный класс
     show_students_for_class(call.message.chat.id, class_name)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('absent_'))
 def handle_student_absent(call):
-    print('handle_student_absent')
     student_id = call.data.split('_')[1]
     student_name = get_student_name_by_id(student_id)  # Получите имя ученика по ID
     class_name = get_class_by_student_id(student_id)  # Получите класс ученика по ID
@@ -345,26 +324,9 @@ def handle_student_absent(call):
                      f"Вы хотите отметить отсутствие ученика {student_name} Выберите причину отсутствия:",
                      reply_markup=markup)
 
-# Функция для добавления message_id в словарь
-def add_message_to_delete(user_id, message_id):
-    print('add_message_to_delete')
-    if user_id not in messages_to_delete:
-        messages_to_delete[user_id] = []
-    messages_to_delete[user_id].append(message_id)
 
-# Функция для удаления сообщений пользователя
-def delete_user_messages(user_id):
-    print('delete_user_messages')
-    if user_id in messages_to_delete:
-        for message_id in messages_to_delete[user_id]:
-            try:
-                bot.delete_message(chat_id=user_id, message_id=message_id)
-            except Exception as e:
-                print(f"Error deleting message: {e}")
-        del messages_to_delete[user_id]  # Очистка списка после удаления
 @bot.callback_query_handler(func=lambda call: call.data.startswith('reason_'))
 def handle_absence_reason(call):
-    print('handle_absence_reason')
     _, student_id, reason_code = call.data.split('_', 2)
     reason = reason_code.replace('_', ' ')
     student_name = get_student_name_by_id(student_id)
@@ -384,7 +346,6 @@ def handle_absence_reason(call):
     )
 
 def get_class_by_student_id(student_id):
-    print('get_class_by_student_id')
     rows = worksheet.get_all_values()
     for row in rows[1:]:  # Пропускаем заголовок
         if row[2] == str(student_id):  # ID ученика находится в третьем столбце (индекс 2)
@@ -393,7 +354,6 @@ def get_class_by_student_id(student_id):
 
 # Функция для получения имени ученика по ID
 def get_student_name_by_id(student_id):
-    print('get_student_name_by_id')
     student_records = worksheet.get_all_records()  # Получаете все записи с листа
 
     for record in student_records:
@@ -407,7 +367,6 @@ def get_student_name_by_id(student_id):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("come_to_lesson"))
 def handle_come_to_lesson(call):
-    print('handle_come_to_lesson')
     _, student_id = call.data.rsplit('_', 1)  # Используйте rsplit для корректной работы с student_id
 
     # Удаление предыдущего сообщения с кнопками
@@ -432,7 +391,6 @@ def handle_come_to_lesson(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('lesson_'))
 def handle_lesson_selection(call):
-    print('handle_lesson_selection')
     _, student_id, lesson_number = call.data.split('_')
     student_name = get_student_name_by_id(student_id)  # Получение имени ученика
     class_name = get_class_by_student_id(student_id)  # Получение класса ученика
@@ -457,7 +415,6 @@ def handle_lesson_selection(call):
 # Обработчик для отметки ученика как отсутствующего
 @bot.callback_query_handler(func=lambda call: call.data.startswith("absent_"))
 def mark_student_absent(call):
-    print('mark_student_absent')
     _, student_id, reason = call.data.split('_')
     student_name = get_student_name_by_id(student_id)  # Предполагаемая функция для получения имени ученика
     class_name = get_class_by_student_id(student_id)  # Предполагаемая функция для получения класса ученика
@@ -475,31 +432,31 @@ def mark_student_absent(call):
 @bot.callback_query_handler(func=lambda call: call.data == "finish_absence_list")
 def handle_finish_absence_list(call):
     user_id = call.from_user.id
-    delete_user_messages(user_id)  # Удаление предыдущих сообщений
-
     selected_classes = load_user_states(user_id)
-    if selected_classes:
-        if len(selected_classes) > 1:
-            # Если у пользователя несколько классов, снова показываем список классов
-            show_classes_to_user(call.message.chat.id, selected_classes)
 
+    if selected_classes:
+        selected_class = selected_classes[0]  # Предполагается один класс для пользователя
+        if selected_class in absences and absences[selected_class]:
+            # Отправка списка отсутствующих и удаление предыдущих сообщений
+            send_absence_list_to_recipient(selected_class, absences[selected_class])
+            # Пример удаления предыдущего сообщения (нужно знать его message_id)
+            # bot.delete_message(chat_id=call.message.chat.id, message_id=MESSAGE_ID)
+
+            # Итоговое сообщение с датой и временем
+            timezone = pytz.timezone('Europe/Moscow')
+            now = datetime.now(timezone).strftime("%d.%m.%Y %H:%M")
+            bot.send_message(call.message.chat.id,
+                             f"Список отсутствующих учеников в {selected_class} классе успешно отправлен {now}.")
+
+            # Очистка списка после отправки
+            absences[selected_class] = []
         else:
-            if user_id in current_class_selection:
-                selected_class = current_class_selection[user_id]  # Используем сохраненный класс
-                if selected_class in absences and absences[selected_class]:
-                    send_absence_list_to_recipient(selected_class, absences[selected_class])
-                    bot.send_message(call.message.chat.id, "Список отсутствующих учеников успешно отправлен.")
-                    # После отправки можно очистить запись для этого пользователя
-                    del current_class_selection[user_id]
-                else:
-                    bot.send_message(call.message.chat.id, "Список отсутствующих учеников пуст.")
-            else:
-                bot.send_message(call.message.chat.id, "Класс для пользователя не найден.")
+            bot.send_message(call.message.chat.id, "Список отсутствующих учеников пуст.")
     else:
         bot.send_message(call.message.chat.id, "Класс для пользователя не найден.")
 
+
 def send_absence_list_to_recipient(selected_class, absence_list):
-    print('send_absence_list_to_recipient')
     # Сортировка списка отсутствующих учеников по алфавиту по имени
     sorted_absence_list = sorted(absence_list, key=lambda x: x['name'])
 
@@ -519,7 +476,6 @@ def send_absence_list_to_recipient(selected_class, absence_list):
 
 @bot.message_handler(func=lambda message: True)
 def echo_all(message):
-    print(echo_all)
     print(message.chat.id)  # Вывод chat_id в консоль
     bot.reply_to(message, f"Ваш chat_id: {message.chat.id}")
 

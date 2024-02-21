@@ -1,6 +1,6 @@
 import sqlite3
 # Имя файла базы данных SQLite
-DB_FILE = 'user_states.db'
+DB_FILE = 'user_states1.db'
 
 def create_tables():
     print('create_tables')
