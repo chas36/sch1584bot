@@ -265,7 +265,10 @@ def show_classes_to_user(chat_id, user_classes):
     for user_class in user_classes:
         button = types.InlineKeyboardButton(user_class, callback_data=f"select_class_{user_class}")
         markup.add(button)
-    bot.send_message(chat_id, "Выберите класс:", reply_markup=markup)
+    # Добавляем кнопку "Отправить все списки"
+    all_lists_button = types.InlineKeyboardButton("Отправить все списки", callback_data="send_all_lists")
+    markup.add(all_lists_button)
+    bot.send_message(chat_id, "Выберите класс или отправьте все списки отсутствующих:", reply_markup=markup)
 
 
 def show_students_for_class(chat_id, selected_class):
@@ -496,25 +499,31 @@ def handle_finish_absence_list(call):
                 bot.send_message(call.message.chat.id, "Класс для пользователя не найден.")
     else:
         bot.send_message(call.message.chat.id, "Класс для пользователя не найден.")
+@bot.callback_query_handler(func=lambda call: call.data == "send_all_lists")
+def handle_send_all_lists(call):
+    user_id = call.from_user.id
+    selected_classes = load_user_states(user_id)
+    # Отправляем списки отсутствующих для всех выбранных классов
+    for selected_class in selected_classes:
+        if selected_class in absences and absences[selected_class]:
+            send_absence_list_to_recipient(selected_class, absences[selected_class])
+        else:
+            bot.send_message(call.message.chat.id, f"Список отсутствующих учеников в классе {selected_class} пуст.")
+    # После отправки всех списков, можно уведомить пользователя
+    bot.send_message(call.message.chat.id, "Все списки отсутствующих успешно отправлены.")
 
 def send_absence_list_to_recipient(selected_class, absence_list):
-    print('send_absence_list_to_recipient')
     # Сортировка списка отсутствующих учеников по алфавиту по имени
     sorted_absence_list = sorted(absence_list, key=lambda x: x['name'])
-
-    # Формирование текста сообщения
+    # Формирование и отправка сообщения
     message_text = f"<b>{selected_class}</b>, список отсутствующих:\n"
     for student in sorted_absence_list:
         message_text += f"{student['name']} - {student['reason']}\n"
-
     if not sorted_absence_list:
         message_text = f"Класс {selected_class}, отсутствующих учеников нет."
-
-    print(message_text)
-
-    # Отправка сообщения
     bot.send_message(RECIPIENT_CHAT_ID, message_text, parse_mode='HTML')
 
+    print(message_text)
 
 @bot.message_handler(func=lambda message: True)
 def echo_all(message):
