@@ -4,9 +4,6 @@ from datetime import datetime
 from bot_initialization import bot, worksheet, RECIPIENT_CHAT_ID
 from database import create_tables, load_user_states, save_user_state, get_users_with_classes
 
-# Имя файла базы данных SQLite
-DB_FILE = 'user_states1.db'
-
 absences = {}
 # Глобальный словарь для хранения текущего класса пользователя
 current_class_selection = {}
@@ -476,29 +473,28 @@ def mark_student_absent(call):
 
 @bot.callback_query_handler(func=lambda call: call.data == "finish_absence_list")
 def handle_finish_absence_list(call):
+    print("handle_finish_absence_list")
     user_id = call.from_user.id
-    delete_user_messages(user_id)  # Удаление предыдущих сообщений
 
     selected_classes = load_user_states(user_id)
     if selected_classes:
         if len(selected_classes) > 1:
             # Если у пользователя несколько классов, снова показываем список классов
             show_classes_to_user(call.message.chat.id, selected_classes)
-
         else:
-            if user_id in current_class_selection:
-                selected_class = current_class_selection[user_id]  # Используем сохраненный класс
-                if selected_class in absences and absences[selected_class]:
-                    send_absence_list_to_recipient(selected_class, absences[selected_class])
-                    bot.send_message(call.message.chat.id, "Список отсутствующих учеников успешно отправлен.")
-                    # После отправки можно очистить запись для этого пользователя
+            # Если у пользователя один класс, используем его напрямую
+            selected_class = selected_classes[0]  # Прямое использование первого и единственного класса
+            if selected_class in absences and absences[selected_class]:
+                send_absence_list_to_recipient(selected_class, absences[selected_class])
+                bot.send_message(call.message.chat.id, "Список отсутствующих учеников успешно отправлен.")
+                # После отправки можно очистить запись для этого пользователя
+                if user_id in current_class_selection:
                     del current_class_selection[user_id]
-                else:
-                    bot.send_message(call.message.chat.id, "Список отсутствующих учеников пуст.")
             else:
-                bot.send_message(call.message.chat.id, "Класс для пользователя не найден.")
+                bot.send_message(call.message.chat.id, "Список отсутствующих учеников пуст.")
     else:
         bot.send_message(call.message.chat.id, "Класс для пользователя не найден.")
+
 @bot.callback_query_handler(func=lambda call: call.data == "send_all_lists")
 def handle_send_all_lists(call):
     user_id = call.from_user.id
