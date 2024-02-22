@@ -77,6 +77,14 @@ def update_cache(data):
     conn.commit()
     conn.close()
 
+def load_cache():
+    conn = sqlite3.connect('cache.db')
+    c = conn.cursor()
+    c.execute("SELECT data FROM cache WHERE id = 1")
+    data = c.fetchone()[0]
+    conn.close()
+    return json.loads(data)
+
 initialize_db()
 data = fetch_data_from_sheets()
 update_cache(data)

@@ -2,7 +2,7 @@ from telebot import types
 import pytz
 from datetime import datetime
 from bot_initialization import bot, worksheet, RECIPIENT_CHAT_ID
-from database import create_tables, load_user_states, save_user_state, get_users_with_classes
+from database import create_tables, load_user_states, save_user_state, get_users_with_classes, load_cache
 
 absences = {}
 # Глобальный словарь для хранения текущего класса пользователя
@@ -52,9 +52,9 @@ def handle_class_selection(chat_id, user_id):
 # Получение списка учеников для выбранных классов
 def get_students_for_class(selected_class):
     print('get_students_for_class')
-    class_column = worksheet.col_values(2)[1:]  # Классы находятся во втором столбце
-    full_name_column = worksheet.col_values(1)[1:]  # Полные имена учеников в первом столбце
-    user_id_column = worksheet.col_values(3)[1:]  # ID пользователя в третьем столбце
+    data = load_cache()
+    students = [(student['ID'], f"{student['FullName'].split()[0]} {student['FullName'].split()[1][0]}.{student['FullName'].split()[2][0]}.") for student in data if student['Класс'] == selected_class]
+    return students
 
     students = []
     for full_name, class_name, user_id in zip(full_name_column, class_column, user_id_column):
@@ -384,23 +384,19 @@ def handle_absence_reason(call):
 
 def get_class_by_student_id(student_id):
     print('get_class_by_student_id')
-    rows = worksheet.get_all_values()
-    for row in rows[1:]:  # Пропускаем заголовок
-        if row[2] == str(student_id):  # ID ученика находится в третьем столбце (индекс 2)
-            return row[1]  # Класс ученика находится во втором столбце (индекс 1)
+    data = load_cache()
+    for student in data:
+        if str(student['ID']) == str(student_id):
+            return student['Класс']
     return "Класс не найден"
 
 # Функция для получения имени ученика по ID
 def get_student_name_by_id(student_id):
     print('get_student_name_by_id')
-    student_records = worksheet.get_all_records()  # Получаете все записи с листа
-
-    for record in student_records:
-        if str(record['ID']) == str(student_id):  # Предполагается, что у вас есть колонка ID
-            full_name = record['FullName']  # И колонка FullName с полным именем ученика
-            name_parts = full_name.split()
-            if len(name_parts) == 3:
-                return f"{name_parts[0]} {name_parts[1][0]}.{name_parts[2][0]}."  # Преобразование в "Фамилия И.О."
+    data = load_cache()
+    for student in data:
+        if str(student['ID']) == str(student_id):
+            return f"{student['FullName'].split()[0]} {student['FullName'].split()[1][0]}.{student['FullName'].split()[2][0]}."
     return "Неизвестный ученик"
 
 
