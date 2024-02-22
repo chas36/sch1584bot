@@ -1,4 +1,7 @@
 import sqlite3
+import json
+from bot_initialization import worksheet
+
 # Имя файла базы данных SQLite
 DB_FILE = 'user_states.db'
 
@@ -50,3 +53,30 @@ def get_users_with_classes():
     print("Users with classes:", [user[0] for user in users])  # Добавляем логирование для отладки
     conn.close()
     return [user[0] for user in users]
+
+def fetch_data_from_sheets():
+    print('fetch_data_from_sheets')
+    data = worksheet.get_all_records()
+    return data
+
+def initialize_db():
+    print('initialize_db')
+    conn = sqlite3.connect('cache.db')
+    c = conn.cursor()
+    # Создаем таблицу, если она еще не существует
+    c.execute('''CREATE TABLE IF NOT EXISTS cache (id INTEGER PRIMARY KEY, data TEXT)''')
+    conn.commit()
+    conn.close()
+
+def update_cache(data):
+    print('update_cache')
+    conn = sqlite3.connect('cache.db')
+    c = conn.cursor()
+    # Сохраняем данные в формате JSON в таблице cache
+    c.execute('INSERT OR REPLACE INTO cache (id, data) VALUES (1, ?)', (json.dumps(data),))
+    conn.commit()
+    conn.close()
+
+initialize_db()
+data = fetch_data_from_sheets()
+update_cache(data)
