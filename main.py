@@ -530,4 +530,5 @@ if __name__ == "__main__":
 
     send_reminders()
 
+
     bot.polling(none_stop=True)
