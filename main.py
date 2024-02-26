@@ -126,11 +126,13 @@ def my_classes(message):
 
 
 def notify_registration_success(user_id, selected_class, username=None):
-    if username:
-        message = f"Новый пользователь зарегистрирован: @{username}, Класс: {selected_class}"
-    else:
-        message = f"Новый пользователь зарегистрирован: ID {user_id}, Класс: {selected_class}"
-    bot.send_message(RECIPIENT_CHAT_ID, message)
+    message_template = "Новый пользователь зарегистрирован: {}, Класс: {}"
+    user_reference = f"@{username}" if username else f"ID {user_id}"
+
+    message = message_template.format(user_reference, selected_class)
+
+    for recipient_id in RECIPIENTS_CHAT_ID:
+        bot.send_message(recipient_id, message)
 
 
 # Декоратор для обработки подтверждения выбора
@@ -515,18 +517,23 @@ def handle_send_all_lists(call):
     # После отправки всех списков, можно уведомить пользователя
     bot.send_message(call.message.chat.id, "Все списки отсутствующих успешно отправлены.")
 
+
 def send_absence_list_to_recipient(selected_class, absence_list):
     # Сортировка списка отсутствующих учеников по алфавиту по имени
     sorted_absence_list = sorted(absence_list, key=lambda x: x['name'])
-    # Формирование и отправка сообщения
+    # Формирование сообщения
     message_text = f"<b>{selected_class}</b>, список отсутствующих:\n"
     for student in sorted_absence_list:
         message_text += f"{student['name']} - {student['reason']}\n"
     if not sorted_absence_list:
         message_text = f"Класс {selected_class}, отсутствующих учеников нет."
-    bot.send_message(RECIPIENT_CHAT_ID, message_text, parse_mode='HTML')
+
+    # Отправка сообщения каждому реципиенту из списка
+    for recipient_id in RECIPIENTS_CHAT_ID:
+        bot.send_message(recipient_id, message_text, parse_mode='HTML')
 
     print(message_text)
+
 
 @bot.message_handler(func=lambda message: True)
 def echo_all(message):
