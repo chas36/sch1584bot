@@ -131,7 +131,7 @@ def notify_registration_success(user_id, selected_class, username=None):
 
     message = message_template.format(user_reference, selected_class)
 
-    for recipient_id in RECIPIENTS_CHAT_ID:
+    for recipient_id in RECIPIENT_CHAT_ID:
         bot.send_message(recipient_id, message)
 
 
@@ -343,9 +343,9 @@ def handle_student_absent(call):
 
     markup = types.InlineKeyboardMarkup()
     come_to_lesson_button = types.InlineKeyboardButton("Придет к ... уроку", callback_data=f"come_to_lesson_{student_id}")
-    reasons = ["Семейные обстоятельства", "По болезни"]
+    reasons = ["Семейные обстоятельства", "По болезни", "Карантин"]
     # Разбиваем список причин на пары для добавления в ряды
-    reason_pairs = [reasons[i:i + 2] for i in range(0, len(reasons), 2)]
+    reason_pairs = [reasons[i:i + 3] for i in range(0, len(reasons), 3)]
     for pair in reason_pairs:
         row_buttons = [
             types.InlineKeyboardButton(reason, callback_data=f"reason_{student_id}_{reason.replace(' ', '_')}") for
@@ -494,8 +494,8 @@ def handle_finish_absence_list(call):
             # Если у пользователя один класс, используем его напрямую
             selected_class = selected_classes[0]  # Прямое использование первого и единственного класса
             if selected_class in absences and absences[selected_class]:
-                send_absence_list_to_recipient(selected_class, absences[selected_class])
-                bot.send_message(call.message.chat.id, "Список отсутствующих учеников успешно отправлен.")
+                send_absence_list_to_recipient(selected_class, absences[selected_class], user_id)
+                bot.send_message(call.message.chat.id, "Список отсутствующих учеников успешно отправлен. Не забудьте продублировать его на платформе SFERUM. Для удобства вы можете скопировать список выше.")
                 # После отправки можно очистить запись для этого пользователя
                 if user_id in current_class_selection:
                     del current_class_selection[user_id]
@@ -511,14 +511,14 @@ def handle_send_all_lists(call):
     # Отправляем списки отсутствующих для всех выбранных классов
     for selected_class in selected_classes:
         if selected_class in absences and absences[selected_class]:
-            send_absence_list_to_recipient(selected_class, absences[selected_class])
+            send_absence_list_to_recipient(selected_class, absences[selected_class], user_id)
         else:
             bot.send_message(call.message.chat.id, f"Список отсутствующих учеников в классе {selected_class} пуст.")
     # После отправки всех списков, можно уведомить пользователя
-    bot.send_message(call.message.chat.id, "Все списки отсутствующих успешно отправлены.")
+    bot.send_message(call.message.chat.id, "Все списки отсутствующих успешно отправлены. Не забудьте продублировать его на платформе SFERUM. Для удобства вы можете скопировать список выше.")
 
 
-def send_absence_list_to_recipient(selected_class, absence_list):
+def send_absence_list_to_recipient(selected_class, absence_list, sender_id):
     # Сортировка списка отсутствующих учеников по алфавиту по имени
     sorted_absence_list = sorted(absence_list, key=lambda x: x['name'])
     # Формирование сообщения
@@ -528,8 +528,12 @@ def send_absence_list_to_recipient(selected_class, absence_list):
     if not sorted_absence_list:
         message_text = f"Класс {selected_class}, отсутствующих учеников нет."
 
-    # Отправка сообщения каждому реципиенту из списка
-    for recipient_id in RECIPIENTS_CHAT_ID:
+    # Добавляем ID отправителя в список реципиентов, если он уже не в списке
+    all_recipients = set(RECIPIENT_CHAT_ID)  # Преобразуем в множество для уникальности
+    all_recipients.add(sender_id)  # Добавляем отправителя
+
+    # Отправка сообщения всем реципиентам, включая отправителя
+    for recipient_id in all_recipients:
         bot.send_message(recipient_id, message_text, parse_mode='HTML')
 
     print(message_text)
