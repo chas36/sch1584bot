@@ -5,48 +5,6 @@ from bot_initialization import worksheet
 # Имя файла базы данных SQLite
 DB_FILE = 'user_states.db'
 
-
-# Путь к файлу базы данных
-db_path = 'C:\Users\Пользователь\PycharmProjects\sch1584bot\user_states.db'
-
-# Создание подключения к базе данных
-conn = sqlite3.connect(db_path)
-
-
-def merge_data():
-    cursor = conn.cursor()
-
-    # Запрос на добавление данных из DB_FILE в user_states
-    insert_query = """
-    INSERT INTO user_states (user_id, selected_class)
-    SELECT user_id, selected_class
-    FROM DB_FILE
-    WHERE NOT EXISTS (
-      SELECT 1 FROM user_states WHERE user_states.user_id = DB_FILE.user_id
-    );
-    """
-    cursor.execute(insert_query)
-
-    # Запрос на обновление существующих данных в user_states на основе данных из DB_FILE
-    update_query = """
-    UPDATE user_states
-    SET selected_class = (
-      SELECT selected_class
-      FROM DB_FILE
-      WHERE DB_FILE.user_id = user_states.user_id
-    )
-    WHERE EXISTS (
-      SELECT 1
-      FROM DB_FILE
-      WHERE DB_FILE.user_id = user_states.user_id
-    );
-    """
-    cursor.execute(update_query)
-
-    # Завершение транзакции
-    conn.commit()
-
-
 def create_tables():
     print('create_tables')
     conn = sqlite3.connect(DB_FILE)

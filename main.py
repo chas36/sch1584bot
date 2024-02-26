@@ -1,6 +1,9 @@
 from telebot import types
 import pytz
-from datetime import datetime
+import schedule
+import time
+from datetime import datetime, timedelta
+import threading
 from bot_initialization import bot, worksheet, RECIPIENT_CHAT_ID
 from database import create_tables, load_user_states, save_user_state, get_users_with_classes, load_cache
 
@@ -254,6 +257,27 @@ def send_reminders():
         reminder_button = types.InlineKeyboardButton("Отправить список отсутствующих", callback_data="send_absent_list")
         markup.add(reminder_button)
         bot.send_message(user_id, "Напоминание: Пожалуйста, отправьте список отсутствующих детей в выбранном классе.", reply_markup=markup)
+
+def run_scheduler():
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+def setup_schedule():
+    # Ваша логика планирования...
+    start_time = datetime.now().replace(hour=22, minute=0, second=0, microsecond=0)
+    end_time = start_time.replace(hour=23)
+    current_time = start_time
+    interval = 60  # Начальный интервал в минутах
+
+    while current_time < end_time:
+        schedule.every().monday.friday.at(current_time.strftime("%H:%M")).do(send_reminders)
+        current_time += timedelta(minutes=interval)
+
+        if current_time.hour >= 9:
+            interval = 20
+        if current_time.hour >= 10:
+            interval = 10
 
 @bot.callback_query_handler(func=lambda call: call.data == "send_absent_list")
 def handle_send_absent_list(call):
@@ -545,14 +569,13 @@ def echo_all(message):
     print(message.chat.id)  # Вывод chat_id в консоль
     bot.reply_to(message, f"Ваш chat_id: {message.chat.id}")
 
-# Отправка сообщения всем пользователям при запуске бота
 if __name__ == "__main__":
-    # Создаем таблицы в базе данных, если их нет
     create_tables()
+    setup_schedule()
 
-    send_reminders()
+    # Запуск планировщика в отдельном потоке
+    scheduler_thread = threading.Thread(target=run_scheduler)
+    scheduler_thread.start()
 
-    merge_data()
-    conn.close()
-
+    # Запуск обработчика сообщений телеграм-бота
     bot.polling(none_stop=True)
