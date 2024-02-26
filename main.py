@@ -552,5 +552,7 @@ if __name__ == "__main__":
 
     send_reminders()
 
+    merge_data()
+    conn.close()
 
     bot.polling(none_stop=True)
