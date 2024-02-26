@@ -10,7 +10,7 @@ def create_tables():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS DB_FILE (
+        CREATE TABLE IF NOT EXISTS user_states (
             user_id INTEGER,
             selected_class TEXT,
             PRIMARY KEY (user_id, selected_class)
@@ -26,7 +26,7 @@ def load_user_states(user_id):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT selected_class FROM DB_FILE WHERE user_id = ?
+        SELECT selected_class FROM user_states WHERE user_id = ?
     ''', (user_id,))
     results = cursor.fetchall()
     conn.close()
@@ -38,7 +38,7 @@ def save_user_state(user_id, selected_class):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT OR REPLACE INTO DB_FILE (user_id, selected_class) VALUES (?, ?)
+        INSERT OR REPLACE INTO user_states (user_id, selected_class) VALUES (?, ?)
     ''', (user_id, selected_class))
     conn.commit()
     conn.close()
@@ -48,7 +48,7 @@ def get_users_with_classes():
     print('get_users_with_classes')
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT user_id FROM DB_FILE")
+    cursor.execute("SELECT DISTINCT user_id FROM user_states")
     users = cursor.fetchall()
     print("Users with classes:", [user[0] for user in users])  # Добавляем логирование для отладки
     conn.close()
@@ -84,6 +84,8 @@ def load_cache():
     data = c.fetchone()[0]
     conn.close()
     return json.loads(data)
+
+
 
 initialize_db()
 data = fetch_data_from_sheets()

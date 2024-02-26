@@ -125,15 +125,26 @@ def my_classes(message):
         bot.send_message(chat_id, "Вы еще не выбрали ни одного класса. Используйте /choose_class.")
 
 
+def notify_registration_success(user_id, selected_class, username=None):
+    if username:
+        message = f"Новый пользователь зарегистрирован: @{username}, Класс: {selected_class}"
+    else:
+        message = f"Новый пользователь зарегистрирован: ID {user_id}, Класс: {selected_class}"
+    bot.send_message(RECIPIENT_CHAT_ID, message)
+
+
 # Декоратор для обработки подтверждения выбора
 @bot.callback_query_handler(func=lambda call: call.data.startswith('confirm_'))
 def handle_confirm_selection(call):
-    print('handle_confirm_selection')
     user_id = call.from_user.id
+    username = call.from_user.username  # Получаем username пользователя
     selected_class = call.data.split('_')[1]
 
     # Сохраняем состояние пользователя (выбранный класс)
     save_user_state(user_id, selected_class)
+
+    # Отправляем уведомление о регистрации с учетом username
+    notify_registration_success(user_id, selected_class, username)
 
     # Отправляем сообщение о подтверждении выбора
     selected_classes = load_user_states(user_id)
