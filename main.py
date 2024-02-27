@@ -72,16 +72,37 @@ def handle_class_selection(call):
 
 # Получение списка учеников для выбранных классов
 def get_students_for_class(selected_class):
-    print("get_students_for_class")
-    data = load_cache()
-    students = [
-        (
-            student["ID"],
-            f"{student['FullName'].split()[0]} {student['FullName'].split()[1][0]}.{student['FullName'].split()[2][0]}.",
-        )
-        for student in data
-        if student["Класс"] == selected_class
-    ]
+    print('get_students_for_class')
+    data = load_cache()  # Загрузка данных о студентах
+    students = []
+
+    # Словарь для отслеживания совпадений ФИО
+    name_counts = {}
+
+    # Сначала соберем все ФИО, чтобы определить, есть ли совпадения
+    for student in data:
+        if student['Класс'] == selected_class:
+            # Генерируем ключ в формате "Фамилия И.О."
+            key = f"{student['FullName'].split()[0]} {student['FullName'].split()[1][0]}.{student['FullName'].split()[2][0]}."
+            if key in name_counts:
+                name_counts[key] += 1
+            else:
+                name_counts[key] = 1
+
+    # Теперь обрабатываем каждого ученика, учитывая совпадения
+    for student in data:
+        if student['Класс'] == selected_class:
+            name_parts = student['FullName'].split()
+            key = f"{name_parts[0]} {name_parts[1][0]}.{name_parts[2][0]}."
+
+            # Если есть совпадения, используем полное имя без отчества
+            if name_counts[key] > 1:
+                name_to_use = f"{name_parts[0]} {name_parts[1]}"  # Использовать полное имя без отчества
+            else:
+                name_to_use = key  # Использовать ФИО с инициалами
+
+            students.append((student['ID'], name_to_use))
+
     return students
 
     # students = []
@@ -197,7 +218,8 @@ def handle_confirm_selection(call):
 # Декоратор для команды "choose_class"
 # Обработчик текстовых сообщений для обработки нажатия кнопки "Выбрать класс"
 @bot.message_handler(func=lambda message: message.text == "Выбрать класс")
-def choose_class(selected_parallel, message):
+def choose_class(message):
+    global selected_parallel
     print("choose_class")
     chat_id = message.chat.id
     user_id = message.from_user.id
@@ -330,8 +352,8 @@ def run_scheduler():
 
 def setup_schedule():
     # Ваша логика планирования...
-    start_time = datetime.now().replace(hour=22, minute=0, second=0, microsecond=0)
-    end_time = start_time.replace(hour=23)
+    start_time = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
+    end_time = start_time.replace(hour=11)
     current_time = start_time
     interval = 60  # Начальный интервал в минутах
 
@@ -683,11 +705,25 @@ def handle_send_all_lists(call):
 
 def send_absence_list_to_recipient(selected_class, absence_list, sender_id):
     # Сортировка списка отсутствующих учеников по алфавиту по имени
-    sorted_absence_list = sorted(absence_list, key=lambda x: x["name"])
+    sorted_absence_list = sorted(absence_list, key=lambda x: x['name'])
     # Формирование сообщения
     message_text = f"<b>{selected_class}</b>, список отсутствующих:\n"
     for student in sorted_absence_list:
-        message_text += f"{student['name']} - {student['reason']}\n"
+        # Изменение формата имени на "Фамилия Имя"
+        name_parts = student['name'].split()
+        name = f"{name_parts[0]} {name_parts[1]}"  # Берем фамилию и имя, отбрасываем отчество
+
+        # Сопоставление причины с сокращением
+        reason = student['reason']
+        reason_mapping = {
+            "Семейные обстоятельства": "с/о",
+            "По болезни": "б",
+            "Карантин": "к",
+            # "Придет к ... уроку" уже в подходящем формате, не требует изменений
+        }
+        reason_short = reason_mapping.get(reason, reason)  # Получаем сокращение или оставляем как есть
+
+        message_text += f"{name} - {reason_short}\n"
     if not sorted_absence_list:
         message_text = f"Класс {selected_class}, отсутствующих учеников нет."
 
@@ -697,7 +733,7 @@ def send_absence_list_to_recipient(selected_class, absence_list, sender_id):
 
     # Отправка сообщения всем реципиентам, включая отправителя
     for recipient_id in all_recipients:
-        bot.send_message(recipient_id, message_text, parse_mode="HTML")
+        bot.send_message(recipient_id, message_text, parse_mode='HTML')
 
     print(message_text)
 
