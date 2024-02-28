@@ -17,7 +17,8 @@ absences = {}
 current_class_selection = {}
 # Предположим, у нас есть словарь для хранения message_id сообщений, которые нужно будет удалить
 messages_to_delete = {}
-selected_parallel = None
+selected_parallel = ''  # Или другое подходящее значение по умолчанию
+
 
 
 # Декоратор для обработки Inline-кнопок
@@ -30,6 +31,7 @@ def handle_class_selection(call):
 
     # Если нажата кнопка "Выбрать еще один класс", вызываем функцию выбора класса
     if call.data == "choose_class":
+
         choose_class(selected_parallel, call.message)
     else:
         # Если выбран конкретный класс, создаем кнопки для подтверждения и выбора еще одного класса
@@ -82,8 +84,13 @@ def get_students_for_class(selected_class):
     # Сначала соберем все ФИО, чтобы определить, есть ли совпадения
     for student in data:
         if student['Класс'] == selected_class:
-            # Генерируем ключ в формате "Фамилия И.О."
-            key = f"{student['FullName'].split()[0]} {student['FullName'].split()[1][0]}.{student['FullName'].split()[2][0]}."
+            name_parts = student['FullName'].split()
+            if len(name_parts) >= 3:
+                key = f"{name_parts[0]} {name_parts[1][0]}.{name_parts[2][0]}."
+            else:
+                # Обработка ситуации с меньшим количеством частей в ФИО
+                key = " ".join(name_parts)  # Простое соединение частей, или другая логика обработки
+
             if key in name_counts:
                 name_counts[key] += 1
             else:
@@ -93,17 +100,21 @@ def get_students_for_class(selected_class):
     for student in data:
         if student['Класс'] == selected_class:
             name_parts = student['FullName'].split()
-            key = f"{name_parts[0]} {name_parts[1][0]}.{name_parts[2][0]}."
+            if len(name_parts) >= 3:
+                key = f"{name_parts[0]} {name_parts[1][0]}.{name_parts[2][0]}."
+            else:
+                key = " ".join(name_parts)  # Используйте адаптированный ключ для меньшего количества частей
 
             # Если есть совпадения, используем полное имя без отчества
             if name_counts[key] > 1:
-                name_to_use = f"{name_parts[0]} {name_parts[1]}"  # Использовать полное имя без отчества
+                name_to_use = " ".join(name_parts[:2])  # Использовать имя и фамилию без отчества
             else:
                 name_to_use = key  # Использовать ФИО с инициалами
 
             students.append((student['ID'], name_to_use))
 
     return students
+
 
     # students = []
     # for full_name, class_name, user_id in zip(full_name_column, class_column, user_id_column):
@@ -563,8 +574,15 @@ def get_student_name_by_id(student_id):
     data = load_cache()
     for student in data:
         if str(student["ID"]) == str(student_id):
-            return f"{student['FullName'].split()[0]} {student['FullName'].split()[1][0]}.{student['FullName'].split()[2][0]}."
+            name_parts = student['FullName'].split()
+            if len(name_parts) >= 3:
+                return f"{name_parts[0]} {name_parts[1][0]}.{name_parts[2][0]}."
+            elif len(name_parts) == 2:
+                return f"{name_parts[0]} {name_parts[1][0]}."
+            else:
+                return name_parts[0]
     return "Неизвестный ученик"
+
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("come_to_lesson"))
