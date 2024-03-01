@@ -3,6 +3,7 @@ import schedule
 import time
 from datetime import datetime, timedelta
 import threading
+import logging
 from bot_initialization import bot, worksheet, RECIPIENT_CHAT_ID
 from database import (
     create_tables,
@@ -11,6 +12,8 @@ from database import (
     get_users_with_classes,
     load_cache,
 )
+logging.basicConfig(level=logging.INFO, filename='bot.log', filemode='a',
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 absences = {}
 # Глобальный словарь для хранения текущего класса пользователя
@@ -32,7 +35,7 @@ def handle_class_selection(call):
     # Если нажата кнопка "Выбрать еще один класс", вызываем функцию выбора класса
     if call.data == "choose_class":
 
-        choose_class(selected_parallel, call.message)
+        choose_class(call.message)
     else:
         # Если выбран конкретный класс, создаем кнопки для подтверждения и выбора еще одного класса
         selected_class = call.data.split("_")[1]
@@ -137,6 +140,10 @@ def start(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     # Добавление кнопки "Выбрать класс"
     markup.add(types.KeyboardButton("Выбрать класс"))
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    absent_button = types.KeyboardButton("Отправить список отсутствующих")
+    markup.add(absent_button)
+    bot.send_message(chat_id, "Выберите действие:", reply_markup=markup)
 
     # Приветственный текст
     welcome_text = (
@@ -360,24 +367,16 @@ def run_scheduler():
         schedule.run_pending()
         time.sleep(1)
 
-
 def setup_schedule():
-    # Ваша логика планирования...
     start_time = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
     end_time = start_time.replace(hour=11)
     current_time = start_time
-    interval = 60  # Начальный интервал в минутах
+    intervals = [(9, 30), (10, 15), (11, 5)]  # (Час окончания, интервал)
 
-    while current_time < end_time:
-        schedule.every().monday.friday.at(current_time.strftime("%H:%M")).do(
-            send_reminders
-        )
-        current_time += timedelta(minutes=interval)
-
-        if current_time.hour >= 9:
-            interval = 20
-        if current_time.hour >= 10:
-            interval = 10
+    for end_hour, interval in intervals:
+        while current_time.hour < end_hour:
+            schedule.every().day.at(current_time.strftime("%H:%M")).do(send_reminders)
+            current_time += timedelta(minutes=interval)
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "send_absent_list")
@@ -766,7 +765,7 @@ def echo_all(message):
 if __name__ == "__main__":
     create_tables()
     setup_schedule()
-
+    #send_reminders()
     # Запуск планировщика в отдельном потоке
     scheduler_thread = threading.Thread(target=run_scheduler)
     scheduler_thread.start()
