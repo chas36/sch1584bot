@@ -1,4 +1,5 @@
 from telebot import types
+import telebot
 import schedule
 import time
 from datetime import datetime, timedelta
@@ -136,13 +137,10 @@ def get_students_for_class(selected_class):
 @bot.message_handler(commands=["start"])
 def start(message):
     chat_id = message.chat.id
-    # Создание Reply клавиатуры
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    # Добавление кнопки "Выбрать класс"
-    markup.add(types.KeyboardButton("Выбрать класс"))
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    class_button = types.KeyboardButton("Выбрать класс")
     absent_button = types.KeyboardButton("Отправить список отсутствующих")
-    markup.add(absent_button)
+    markup.add(class_button, absent_button)  # Добавляем обе кнопки
     bot.send_message(chat_id, "Выберите действие:", reply_markup=markup)
 
     # Приветственный текст
@@ -346,20 +344,23 @@ def handle_text(message):
 
 def send_reminders():
     print("send_reminders")
-    users = (
-        get_users_with_classes()
-    )  # Получаем список пользователей с выбранными классами
+    users = get_users_with_classes()  # Получаем список пользователей с выбранными классами
     for user_id in users:
-        markup = types.InlineKeyboardMarkup()
-        reminder_button = types.InlineKeyboardButton(
-            "Отправить список отсутствующих", callback_data="send_absent_list"
-        )
-        markup.add(reminder_button)
-        bot.send_message(
-            user_id,
-            "Напоминание: Пожалуйста, отправьте список отсутствующих детей в выбранном классе.",
-            reply_markup=markup,
-        )
+        try:
+            markup = types.InlineKeyboardMarkup()
+            reminder_button = types.InlineKeyboardButton("Отправить список отсутствующих", callback_data="send_absent_list")
+            markup.add(reminder_button)
+            bot.send_message(
+                user_id,
+                "Напоминание: Пожалуйста, отправьте список отсутствующих детей в выбранном классе.",
+                reply_markup=markup,
+            )
+        except telebot.apihelper.ApiTelegramException as e:
+            if e.error_code == 403:
+                print(f"Не удалось отправить сообщение пользователю {user_id} - бот заблокирован.")
+            else:
+                raise  # Повторно поднимаем исключение, если ошибка не связана с блокировкой
+
 
 
 def run_scheduler():
@@ -369,9 +370,9 @@ def run_scheduler():
 
 def setup_schedule():
     start_time = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
-    end_time = start_time.replace(hour=11)
+    end_time = start_time.replace(hour=10)
     current_time = start_time
-    intervals = [(9, 30), (10, 15), (11, 5)]  # (Час окончания, интервал)
+    intervals = [(9, 30), (10, 15)]  # (Час окончания, интервал)
 
     for end_hour, interval in intervals:
         while current_time.hour < end_hour:
