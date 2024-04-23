@@ -1,0 +1,10 @@
+meta:
+  version: "3.8"
+  environment: python
+  toolchain: pip
+build:
+  requirementsPath: requirements.txt
+run:
+  scriptName: app.py
+  persistenceMount: /data
+  containerPort: "80"
