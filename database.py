@@ -99,7 +99,6 @@ def load_cache():
   conn.close()
   return json.loads(data)
 
-
 initialize_db()
 data = fetch_data_from_sheets()
 update_cache(data)
