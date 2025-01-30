@@ -99,6 +99,38 @@ def load_cache():
   conn.close()
   return json.loads(data)
 
+
+def save_access_key_state(user_id, state):
+    print('save_access_key_state')
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS access_key_states (
+            user_id INTEGER PRIMARY KEY,
+            has_access INTEGER
+        )
+    ''')
+    cursor.execute('''
+        INSERT OR REPLACE INTO access_key_states (user_id, has_access) VALUES (?, ?)
+    ''', (user_id, int(state)))
+    conn.commit()
+    conn.close()
+
+def load_access_key_state(user_id):
+    print('load_access_key_state')
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS access_key_states (
+            user_id INTEGER PRIMARY KEY,
+            has_access INTEGER
+        )
+    ''')
+    cursor.execute('SELECT has_access FROM access_key_states WHERE user_id = ?', (user_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return bool(result[0]) if result else False
+
 initialize_db()
 data = fetch_data_from_sheets()
 update_cache(data)

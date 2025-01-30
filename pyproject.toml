@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "repl-nix-sch1584bot"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{include = "repl_nix_sch1584bot"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pytelegrambotapi = "^4.16.1"
+requests = "^2.31.0"
+schedule = "^1.2.1"
+flask = "^3.0.2"
+gspread = "^6.1.0"
+oauth2client = "^4.1.3"
+pytz = "^2024.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

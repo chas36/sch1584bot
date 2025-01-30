@@ -1,0 +1,48 @@
+Traceback (most recent call last):
+  File "main.py", line 3, in <module>
+    from telebot import types
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/telebot/__init__.py", line 40, in <module>
+    from telebot import apihelper, util, types
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/telebot/apihelper.py", line 11, in <module>
+    import requests
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/requests/__init__.py", line 43, in <module>
+    import urllib3
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/urllib3/__init__.py", line 42, in <module>
+    raise ImportError(
+ImportError: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'OpenSSL 1.1.0l  10 Sep 2019'. See: https://github.com/urllib3/urllib3/issues/2168
+Traceback (most recent call last):
+  File "main.py", line 3, in <module>
+    from telebot import types
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/telebot/__init__.py", line 40, in <module>
+    from telebot import apihelper, util, types
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/telebot/apihelper.py", line 11, in <module>
+    import requests
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/requests/__init__.py", line 43, in <module>
+    import urllib3
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/urllib3/__init__.py", line 42, in <module>
+    raise ImportError(
+ImportError: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'OpenSSL 1.1.0l  10 Sep 2019'. See: https://github.com/urllib3/urllib3/issues/2168
+Traceback (most recent call last):
+  File "main.py", line 3, in <module>
+    from telebot import types
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/telebot/__init__.py", line 40, in <module>
+    from telebot import apihelper, util, types
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/telebot/apihelper.py", line 11, in <module>
+    import requests
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/requests/__init__.py", line 43, in <module>
+    import urllib3
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/urllib3/__init__.py", line 42, in <module>
+    raise ImportError(
+ImportError: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'OpenSSL 1.1.0l  10 Sep 2019'. See: https://github.com/urllib3/urllib3/issues/2168
+Traceback (most recent call last):
+  File "main.py", line 3, in <module>
+    from telebot import types
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/telebot/__init__.py", line 40, in <module>
+    from telebot import apihelper, util, types
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/telebot/apihelper.py", line 11, in <module>
+    import requests
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/requests/__init__.py", line 43, in <module>
+    import urllib3
+  File "/var/www/u2802129/data/www/ascher.tech/sch1584bot/mybotenv/lib/python3.8/site-packages/urllib3/__init__.py", line 42, in <module>
+    raise ImportError(
+ImportError: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'OpenSSL 1.1.0l  10 Sep 2019'. See: https://github.com/urllib3/urllib3/issues/2168

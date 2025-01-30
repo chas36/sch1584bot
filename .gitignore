@@ -1,0 +1,20 @@
+# Игнорировать все файлы .log
+*.log
+
+# Игнорировать все файлы в директории build
+#build/
+__pycache__/
+__pycache__/
+.cache/
+.idea/
+virtualenv/
+.pythonlibs/
+.upm/
+mybotenv/
+venv/
+# Игнорировать конкретный файл
+#config/settings.ini
+cache.db
+sch1584-dc1c7afa27e3.json
+user_states.db
+.env
